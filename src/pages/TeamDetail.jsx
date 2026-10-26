@@ -60,6 +60,17 @@ export default function TeamDetail() {
   const results = teamMatches
     .filter((match) => match.status === 'completed' || match.status === 'abandoned')
     .sort((a, b) => new Date(b.startTime) - new Date(a.startTime))
+  const liveMatch = teamMatches
+    .filter((match) => match.status === 'live')
+    .sort((a, b) => new Date(a.startTime) - new Date(b.startTime))[0]
+  const nextFixture = teamMatches
+    .filter((match) => match.status === 'upcoming' && new Date(match.startTime).getTime() >= Date.now())
+    .sort((a, b) => new Date(a.startTime) - new Date(b.startTime))[0]
+  const featuredUpcoming = liveMatch ?? nextFixture
+  const latestResult = results[0]
+  const playerOfLatestResult = latestResult?.playerOfMatchId
+    ? players.find((player) => player.id === latestResult.playerOfMatchId)
+    : null
 
   const roleGroups = [
     { key: 'batter', label: 'Batters' },
@@ -129,6 +140,30 @@ export default function TeamDetail() {
           </div>
         </div>
       </section>
+
+      {(featuredUpcoming || latestResult) && (
+        <section className="section-tight team-match-spotlight" aria-label={`${team.name} match updates`}>
+          <div className="team-match-spotlight-grid">
+            {featuredUpcoming && (
+              <div className="card card-pad">
+                <span className="eyebrow">{liveMatch ? 'In progress' : 'Next up'}</span>
+                <MatchRow match={featuredUpcoming} teamsById={teamsById} />
+              </div>
+            )}
+            {latestResult && (
+              <div className="card card-pad">
+                <span className="eyebrow">Latest result</span>
+                <MatchRow match={latestResult} teamsById={teamsById} />
+                {playerOfLatestResult && (
+                  <p className="small muted team-match-player">
+                    Player of the match: <strong>{playerOfLatestResult.name}</strong>
+                  </p>
+                )}
+              </div>
+            )}
+          </div>
+        </section>
+      )}
 
       {/* Leadership & Staff Spotlight */}
       <section className="section" aria-labelledby="staff-heading" style={{ marginTop: '1.5rem' }}>

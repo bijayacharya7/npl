@@ -1209,6 +1209,24 @@ ol {
   gap: 0.25rem;
 }
 
+.team-match-spotlight {
+  margin-top: 1rem;
+}
+
+.team-match-spotlight-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 360px), 1fr));
+  gap: 0.8rem;
+}
+
+.team-match-spotlight-grid .fixture-row {
+  margin-top: 0.55rem;
+}
+
+.team-match-player {
+  margin: 0.5rem 0 0;
+}
+
 /* -------------------------------------------------------------------------- */
 /* Tables                                                                     */
 /* -------------------------------------------------------------------------- */
