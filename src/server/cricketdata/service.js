@@ -18,6 +18,8 @@ import { createMemoryStore, createStore } from './store.js'
 const inflight = new Map()
 const minute = 60 * 1000
 const KHELNOW_CACHE_MS = 55 * 1000
+const KHELNOW_RETENTION_MS = 14 * 24 * 60 * 60 * 1000
+const KHELNOW_CACHE_KEY = 'khelnow_npl_2026'
 
 function emptyFeed(partial = {}) {
   return {
@@ -85,20 +87,40 @@ export function createCricketdataService(options = {}) {
   let khelnowInflight = null
 
   async function getKhelNowLive() {
-    if (!khelnowEnabled || !nplHasLiveWindow(localMatches, nowFn().getTime())) return null
+    if (!khelnowEnabled) return null
+    const now = nowFn()
+    const stored = await readCache(KHELNOW_CACHE_KEY)
+    const storedAt = stored?.payload?.fetchedAt ? new Date(stored.payload.fetchedAt).getTime() : 0
+    const previousPayload = storedAt && now.getTime() - storedAt <= KHELNOW_RETENTION_MS
+      ? stored.payload
+      : null
+    const hasUnfinishedCachedMatch = previousPayload?.matches?.some((match) =>
+      !['completed', 'abandoned', 'postponed'].includes(match.status) &&
+      (match.status === 'live' || match.innings?.length),
+    )
+    if (!nplHasLiveWindow(localMatches, now.getTime()) && !hasUnfinishedCachedMatch) return previousPayload
     if (khelnowCache && khelnowCache.expiresAt > nowFn().getTime()) return khelnowCache.payload
     if (khelnowInflight) return khelnowInflight
 
     khelnowInflight = fetchKhelNowNplLive({
-      localMatches, teams, players, now: nowFn().getTime(), fetchImpl: options.khelnowFetchImpl,
+      localMatches, teams, players, previousPayload, now: now.getTime(), fetchImpl: options.khelnowFetchImpl,
     })
-      .then((payload) => {
-        khelnowCache = { payload, expiresAt: nowFn().getTime() + KHELNOW_CACHE_MS }
-        return payload
+      .then(async (payload) => {
+        const result = payload?.matches?.length ? payload : previousPayload
+        if (payload?.matches?.length) {
+          try {
+            await writeCache(KHELNOW_CACHE_KEY, DATASETS.CURRENT_MATCHES, payload, KHELNOW_RETENTION_MS, 'ok')
+          } catch (error) {
+            await store.addEvent({ dataset: DATASETS.CURRENT_MATCHES, action: 'cache-error', detail: `KhelNow score cache: ${error.message}`, ok: false })
+          }
+        }
+        khelnowCache = { payload: result, expiresAt: nowFn().getTime() + KHELNOW_CACHE_MS }
+        return result
       })
       .catch(async (error) => {
         await store.addEvent({ dataset: DATASETS.CURRENT_MATCHES, action: 'fallback-error', detail: `KhelNow live page: ${error.message}`, ok: false })
-        return null
+        khelnowCache = { payload: previousPayload, expiresAt: nowFn().getTime() + KHELNOW_CACHE_MS }
+        return previousPayload
       })
       .finally(() => { khelnowInflight = null })
     return khelnowInflight
@@ -483,7 +505,8 @@ export function createCricketdataService(options = {}) {
     }
 
     const series = info?.series ?? search?.series ?? null
-    const available = Boolean(series || khelnowFresh)
+    const hasKhelNowData = Boolean(khelnow?.matches?.length)
+    const available = Boolean(series || hasKhelNowData)
     const hasMapped = overlays.length > 0
     const hasCompleted = overlays.some((row) => row.status === 'completed' && row.result)
     const scorecards = {
@@ -494,17 +517,22 @@ export function createCricketdataService(options = {}) {
     const hasScorecards = Boolean(scorecards.batting.length || scorecards.bowling.length)
     const quota = await quotaSnapshot()
 
-    const message = khelnowFresh
-      ? `${khelnowLiveFresh ? 'Live scorecard' : 'Match scorecard'} updated from KhelNow${series ? ' with CricketData.org coverage' : ''}.`
-      : !config.apiKey
-      ? 'Set CRICKETDATA_API_KEY on the server to enable CricketData.org.'
-      : hasMapped
-          ? `Mapped ${overlays.length} NPL 2026 match${overlays.length === 1 ? '' : 'es'}${series?.name ? ` from ${series.name}` : ' from the current-match feed'}.`
-          : quota.lastError
-            ? 'CricketData.org could not be reached. Live scores are unavailable until the provider connection recovers.'
-            : !available
-              ? 'CricketData.org has no Nepal Premier League 2026 series in its catalogue yet. Fixtures and scores on this site stay on the verified local schedule and admin entries.'
-              : `${series.name} was found, but matches could not be mapped onto the local NPL 2026 fixture list.`
+    let message
+    if (khelnowFresh) {
+      message = `${khelnowLiveFresh ? 'Live scorecard' : 'Match scorecard'} updated from KhelNow${series ? ' with CricketData.org coverage' : ''}.`
+    } else if (hasKhelNowData) {
+      message = 'Showing the most recent KhelNow scorecard; a newer update is not available yet.'
+    } else if (!config.apiKey) {
+      message = 'Set CRICKETDATA_API_KEY on the server to enable CricketData.org.'
+    } else if (hasMapped) {
+      message = `Mapped ${overlays.length} NPL 2026 match${overlays.length === 1 ? '' : 'es'}${series?.name ? ` from ${series.name}` : ' from the current-match feed'}.`
+    } else if (quota.lastError) {
+      message = 'CricketData.org could not be reached. Live scores are unavailable until the provider connection recovers.'
+    } else if (!available) {
+      message = 'CricketData.org has no Nepal Premier League 2026 series in its catalogue yet. Fixtures and scores on this site stay on the verified local schedule and admin entries.'
+    } else {
+      message = `${series.name} was found, but matches could not be mapped onto the local NPL 2026 fixture list.`
+    }
 
     return {
       overlay: {
@@ -513,7 +541,7 @@ export function createCricketdataService(options = {}) {
         squads: info?.squads ?? [],
       },
       meta: {
-        provider: khelnowFresh ? 'KhelNow live scoreboard' : PROVIDER.name,
+        provider: hasKhelNowData ? 'KhelNow live scoreboard' : PROVIDER.name,
         available,
         coverage: available ? (hasMapped ? 'partial' : 'series-only') : 'none',
         message,
@@ -521,7 +549,7 @@ export function createCricketdataService(options = {}) {
         expiresAt: newest?.expiresAt ?? null,
         liveFresh,
         liveMatchIds,
-        lastUpdatedLabel: khelnowFresh ? khelnow.fetchedAt : newest?.fetchedAt ?? null,
+        lastUpdatedLabel: hasKhelNowData ? khelnow.fetchedAt : newest?.fetchedAt ?? null,
         quota,
         series,
       },

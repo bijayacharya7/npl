@@ -188,6 +188,7 @@ function mapKhelNowMatch(data, local, teams, players) {
     match: {
       matchId: local.id,
       providerMatchId: String(info.match_id ?? data.en_match_id ?? data.id),
+      khelnowMatchPageId: String(data.id ?? data.en_match_id ?? info.match_id),
       apiUpdatedAt: new Date().toISOString(),
       dataSourceLabel: 'KhelNow',
       status,
@@ -224,34 +225,42 @@ function mapKhelNowMatch(data, local, teams, players) {
   }
 }
 
-export async function fetchKhelNowNplLive({ localMatches, teams, players, now = Date.now(), fetchImpl = globalThis.fetch }) {
+export async function fetchKhelNowNplLive({ localMatches, teams, players, previousPayload = null, now = Date.now(), fetchImpl = globalThis.fetch }) {
   const listHtml = await fetchText(KHELNOW_LIVE_INDEX, fetchImpl)
   const pageProps = extractPageProps(listHtml)
-  const candidates = (pageProps.initialMatches ?? []).filter((row) => {
-    if (!/nepal premier league/i.test(row.competition?.name ?? '')) return false
-    if (String(row.competition?.season ?? '') !== '2026') return false
+  const candidates = (pageProps.initialMatches ?? []).flatMap((row) => {
+    if (!/nepal premier league/i.test(row.competition?.name ?? '')) return []
+    if (String(row.competition?.season ?? '') !== '2026') return []
     const localDate = dateInNepal(row.dateStart)
     const fixture = matchLocalFixture({
       name: `${row.teamA?.teamName ?? ''} vs ${row.teamB?.teamName ?? ''}`,
       teams: [row.teamA?.teamName, row.teamB?.teamName].filter(Boolean),
       date: localDate,
     }, localMatches, teams).local
-    return fixture && fixture.verifiedSchedule !== false &&
-      localMatchIsInLiveWindow(fixture, now) &&
-      row.matchId
+    return fixture && fixture.verifiedSchedule !== false && localMatchIsInLiveWindow(fixture, now) && row.matchId
+      ? [{ pageId: String(row.matchId), local: fixture }]
+      : []
   })
 
-  for (const row of candidates) {
-    const local = matchLocalFixture({
-      name: `${row.teamA?.teamName ?? ''} vs ${row.teamB?.teamName ?? ''}`,
-      teams: [row.teamA?.teamName, row.teamB?.teamName].filter(Boolean),
-      date: dateInNepal(row.dateStart),
-    }, localMatches, teams).local
-    if (!local) continue
-    const detailHtml = await fetchText(`${KHELNOW_MATCH_PAGE}${encodeURIComponent(row.matchId)}`, fetchImpl)
+  const candidateIds = new Set(candidates.map((candidate) => candidate.local.id))
+  const knownMatches = (previousPayload?.matches ?? [])
+    .filter((match) =>
+      !['completed', 'abandoned', 'postponed'].includes(match.status) &&
+      (match.status === 'live' || match.innings?.length) &&
+      match.khelnowMatchPageId &&
+      !candidateIds.has(match.matchId),
+    )
+    .flatMap((match) => {
+      const local = localMatches.find((row) => row.id === match.matchId)
+      return local ? [{ pageId: match.khelnowMatchPageId, local }] : []
+    })
+
+  for (const { pageId, local } of [...candidates, ...knownMatches]) {
+    const detailHtml = await fetchText(`${KHELNOW_MATCH_PAGE}${encodeURIComponent(pageId)}`, fetchImpl)
     const data = matchDataFromPage(extractPageProps(detailHtml))
     const mapped = mapKhelNowMatch(data, local, teams, players)
     if (!mapped) continue
+    mapped.match.khelnowMatchPageId = pageId
     return {
       matches: [mapped.match],
       scorecards: mapped.scorecards,
