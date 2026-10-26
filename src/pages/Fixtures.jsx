@@ -15,19 +15,14 @@ export default function Fixtures() {
   const [query, setQuery] = useState('')
   const teamFilter = searchParams.get('team') ?? 'all'
 
-  const openMatches = useMemo(
-    () => matches.filter((match) => ['upcoming', 'live', 'postponed'].includes(match.status)),
-    [matches],
-  )
-
   const dates = useMemo(
-    () => [...new Set(openMatches.map((match) => nptDateKey(match.startTime)))].sort(),
-    [openMatches],
+    () => [...new Set(matches.map((match) => nptDateKey(match.startTime)))].sort(),
+    [matches],
   )
 
   const filtered = useMemo(() => {
     const term = query.trim().toLowerCase()
-    return openMatches.filter((match) => {
+    return matches.filter((match) => {
       if (teamFilter !== 'all' && match.homeTeamId !== teamFilter && match.awayTeamId !== teamFilter) return false
       if (date !== 'all' && nptDateKey(match.startTime) !== date) return false
       if (stage === 'league' && match.stage !== 'league') return false
@@ -47,7 +42,7 @@ export default function Fixtures() {
       }
       return true
     })
-  }, [openMatches, teamFilter, date, stage, query, teamsById])
+  }, [matches, teamFilter, date, stage, query, teamsById])
 
   const grouped = useMemo(() => {
     const map = new Map()
@@ -75,7 +70,7 @@ export default function Fixtures() {
       <PageHeader
         eyebrow="26 October – 21 November 2026"
         title="Fixtures"
-        description="All 32 matches at TU International Cricket Ground, Kirtipur. Times are Nepal Standard Time (NPT, UTC+05:45). Playoff fixtures show placeholders until the league table decides the teams."
+        description="All 32 Nepal Premier League matches, including upcoming fixtures and completed results with scores. Times are Nepal Standard Time (NPT, UTC+05:45)."
       />
 
       <div className="card card-pad" style={{ marginBottom: '1.5rem' }}>
@@ -148,7 +143,7 @@ export default function Fixtures() {
         </div>
         <div className="spread" style={{ marginTop: '0.8rem' }}>
           <span className="small muted">
-            {filtered.length} of {openMatches.length} upcoming matches shown
+            {filtered.length} of {matches.length} matches shown
           </span>
           <button type="button" className="btn btn-ghost btn-sm" onClick={reset}>
             Clear filters

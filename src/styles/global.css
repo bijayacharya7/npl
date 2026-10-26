@@ -1181,6 +1181,25 @@ ol {
   font-size: 0.74rem;
 }
 
+.fixture-result-scores {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem 0.9rem;
+  margin-top: 0.3rem;
+  font-size: 0.78rem;
+  font-weight: 700;
+}
+
+.fixture-result-scores > span {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 0.3rem;
+}
+
+.fixture-result-summary {
+  margin: 0.2rem 0;
+}
+
 .fixture-side {
   text-align: right;
   flex-shrink: 0;

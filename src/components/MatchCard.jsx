@@ -108,6 +108,8 @@ export function MatchCard({ match, teamsById }) {
 export function MatchRow({ match, teamsById }) {
   const home = match.homeTeamId ? teamsById[match.homeTeamId] : null
   const away = match.awayTeamId ? teamsById[match.awayTeamId] : null
+  const homeInnings = match.innings?.find((innings) => innings.teamId === match.homeTeamId)
+  const awayInnings = match.innings?.find((innings) => innings.teamId === match.awayTeamId)
   const date = new Date(match.startTime)
   const day = new Intl.DateTimeFormat('en-GB', {
     timeZone: 'Asia/Kathmandu',
@@ -130,6 +132,21 @@ export function MatchRow({ match, teamsById }) {
           <span className="muted">vs</span>
           <TeamLabel team={away} size="sm">{away?.name ?? match.awayLabel ?? 'TBC'}</TeamLabel>
         </div>
+        {(homeInnings || awayInnings) && (
+          <div className="fixture-result-scores" aria-label="Match scores">
+            {homeInnings && (
+              <span>
+                {home?.shortName ?? home?.abbreviation ?? home?.name} <InningsScore innings={homeInnings} />
+              </span>
+            )}
+            {awayInnings && (
+              <span>
+                {away?.shortName ?? away?.abbreviation ?? away?.name} <InningsScore innings={awayInnings} />
+              </span>
+            )}
+          </div>
+        )}
+        {match.result?.summary && <p className="match-result-line fixture-result-summary">{match.result.summary}</p>}
         <small>
           {formatMatchTime(match.startTime)} NPT &middot; {STAGE_LABELS[match.stage]} &middot; Match {match.matchNo}
         </small>
