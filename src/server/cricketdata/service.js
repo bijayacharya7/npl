@@ -18,8 +18,14 @@ import { createMemoryStore, createStore } from './store.js'
 const inflight = new Map()
 const minute = 60 * 1000
 const KHELNOW_CACHE_MS = 55 * 1000
-const KHELNOW_RETENTION_MS = 14 * 24 * 60 * 60 * 1000
+const KHELNOW_RETENTION_MS = 365 * 24 * 60 * 60 * 1000
 const KHELNOW_CACHE_KEY = 'khelnow_npl_2026'
+
+function nplSeasonIsActive(matches, now) {
+  const starts = matches.map((match) => new Date(match.startTime).getTime()).filter(Number.isFinite)
+  if (!starts.length) return false
+  return now >= Math.min(...starts) - 24 * 60 * minute && now <= Math.max(...starts) + 24 * 60 * minute
+}
 
 function emptyFeed(partial = {}) {
   return {
@@ -98,7 +104,8 @@ export function createCricketdataService(options = {}) {
       !['completed', 'abandoned', 'postponed'].includes(match.status) &&
       (match.status === 'live' || match.innings?.length),
     )
-    if (!nplHasLiveWindow(localMatches, now.getTime()) && !hasUnfinishedCachedMatch) return previousPayload
+    if (storedAt && now.getTime() - storedAt <= KHELNOW_CACHE_MS && previousPayload) return previousPayload
+    if (!nplHasLiveWindow(localMatches, now.getTime()) && !hasUnfinishedCachedMatch && !nplSeasonIsActive(localMatches, now.getTime())) return previousPayload
     if (khelnowCache && khelnowCache.expiresAt > nowFn().getTime()) return khelnowCache.payload
     if (khelnowInflight) return khelnowInflight
 
@@ -106,12 +113,14 @@ export function createCricketdataService(options = {}) {
       localMatches, teams, players, previousPayload, now: now.getTime(), fetchImpl: options.khelnowFetchImpl,
     })
       .then(async (payload) => {
-        const result = payload?.matches?.length ? payload : previousPayload
-        if (payload?.matches?.length) {
+        const result = payload?.matches?.length || !previousPayload?.matches?.length ? payload : previousPayload
+        try {
+          await writeCache(KHELNOW_CACHE_KEY, DATASETS.CURRENT_MATCHES, result, KHELNOW_RETENTION_MS, 'ok')
+        } catch (error) {
           try {
-            await writeCache(KHELNOW_CACHE_KEY, DATASETS.CURRENT_MATCHES, payload, KHELNOW_RETENTION_MS, 'ok')
-          } catch (error) {
             await store.addEvent({ dataset: DATASETS.CURRENT_MATCHES, action: 'cache-error', detail: `KhelNow score cache: ${error.message}`, ok: false })
+          } catch {
+            // The live response remains usable if the optional cache is unavailable.
           }
         }
         khelnowCache = { payload: result, expiresAt: nowFn().getTime() + KHELNOW_CACHE_MS }

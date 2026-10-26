@@ -1,6 +1,7 @@
-import { classifyMatchStatus, localMatchIsInLiveWindow, mapResult, matchLocalFixture, normalizeName } from './mapper.js'
+import { classifyMatchStatus, localMatchIsInLiveWindow, mapResult, matchLocalFixture, normalizeName, resolveTeamId } from './mapper.js'
 
 const KHELNOW_LIVE_INDEX = 'https://khelnow.com/cricket/live-score'
+const KHELNOW_NPL_RESULTS = 'https://khelnow.com/cricket/competition/nepal-premier-league-1547/fixtures-and-results?competition=1547'
 const KHELNOW_MATCH_PAGE = 'https://khelnow.com/live-cricket-score/match-'
 const REQUEST_TIMEOUT_MS = 12_000
 
@@ -225,50 +226,169 @@ function mapKhelNowMatch(data, local, teams, players) {
   }
 }
 
-export async function fetchKhelNowNplLive({ localMatches, teams, players, previousPayload = null, now = Date.now(), fetchImpl = globalThis.fetch }) {
-  const listHtml = await fetchText(KHELNOW_LIVE_INDEX, fetchImpl)
-  const pageProps = extractPageProps(listHtml)
-  const candidates = (pageProps.initialMatches ?? []).flatMap((row) => {
-    if (!/nepal premier league/i.test(row.competition?.name ?? '')) return []
-    if (String(row.competition?.season ?? '') !== '2026') return []
-    const localDate = dateInNepal(row.dateStart)
-    const fixture = matchLocalFixture({
-      name: `${row.teamA?.teamName ?? ''} vs ${row.teamB?.teamName ?? ''}`,
-      teams: [row.teamA?.teamName, row.teamB?.teamName].filter(Boolean),
-      date: localDate,
-    }, localMatches, teams).local
-    return fixture && fixture.verifiedSchedule !== false && localMatchIsInLiveWindow(fixture, now) && row.matchId
-      ? [{ pageId: String(row.matchId), local: fixture }]
-      : []
-  })
+function mapKhelNowScheduleMatch(row, localMatches, teams) {
+  if (!/nepal premier league/i.test(row?.competition?.title ?? 'Nepal Premier League')) return null
+  const local = matchLocalFixture({
+    name: row.title ?? '',
+    teams: [row.teama?.name, row.teamb?.name].filter(Boolean),
+    date: dateInNepal(row.date_start ?? row.dateStart),
+  }, localMatches, teams).local
+  if (!local || local.verifiedSchedule === false) return null
 
-  const candidateIds = new Set(candidates.map((candidate) => candidate.local.id))
+  const statusText = [row.status_str, row.status_note, row.result].filter(Boolean).join(' ')
+  const status = Number(row.status) === 2 || /\bcompleted\b|\bwon by\b/i.test(statusText)
+    ? 'completed'
+    : classifyMatchStatus(statusText)
+  if (!['completed', 'abandoned', 'postponed'].includes(status)) return null
+
+  const homeTeamId = resolveTeamId(row.teama?.name, teams)
+  const awayTeamId = resolveTeamId(row.teamb?.name, teams)
+  const innings = [
+    { teamId: homeTeamId, ...scoreParts({ scores_full: row.teama?.scores_full }) },
+    { teamId: awayTeamId, ...scoreParts({ scores_full: row.teamb?.scores_full }) },
+  ].filter((inning) => inning.teamId && (inning.runs || inning.wickets || inning.overs))
+  const teamsById = Object.fromEntries(teams.map((team) => [team.id, team]))
+  const mappedResult = status === 'completed'
+    ? mapResult(statusText, [local.homeTeamId, local.awayTeamId], teamsById)
+    : null
+  const winningTeamId = String(row.winning_team_id ?? '') === String(row.teama?.team_id ?? '')
+    ? homeTeamId
+    : String(row.winning_team_id ?? '') === String(row.teamb?.team_id ?? '')
+      ? awayTeamId
+      : null
+  const result = status === 'completed'
+    ? {
+        ...(mappedResult
+          ? { ...mappedResult, winnerTeamId: mappedResult.winnerTeamId ?? winningTeamId }
+          : { type: 'win', winnerTeamId: winningTeamId, margin: null }),
+        summary: row.status_note || row.result || statusText,
+      }
+    : null
+
+  return {
+    matchId: local.id,
+    providerMatchId: String(row.match_id ?? row.id),
+    khelnowMatchPageId: String(row.id),
+    apiUpdatedAt: new Date().toISOString(),
+    dataSourceLabel: 'KhelNow',
+    status,
+    statusNote: row.status_note || row.result || null,
+    innings,
+    result,
+    toss: null,
+    liveConfirmed: false,
+    liveDetails: null,
+  }
+}
+
+function mergeScorecards(...scorecards) {
+  const merged = { batting: [], bowling: [], fielding: [] }
+  for (const kind of Object.keys(merged)) {
+    const rows = scorecards.flatMap((scorecard) => scorecard?.[kind] ?? [])
+    const unique = new Map()
+    for (const row of rows) unique.set(`${row.matchId}:${row.playerId}`, row)
+    merged[kind] = [...unique.values()]
+  }
+  return merged
+}
+
+export async function fetchKhelNowNplLive({ localMatches, teams, players, previousPayload = null, now = Date.now(), fetchImpl = globalThis.fetch }) {
+  let liveCandidates = []
+  try {
+    const pageProps = extractPageProps(await fetchText(KHELNOW_LIVE_INDEX, fetchImpl))
+    liveCandidates = (pageProps.initialMatches ?? []).flatMap((row) => {
+      if (!/nepal premier league/i.test(row.competition?.name ?? '')) return []
+      if (String(row.competition?.season ?? '') !== '2026') return []
+      const localDate = dateInNepal(row.dateStart)
+      const fixture = matchLocalFixture({
+        name: `${row.teamA?.teamName ?? ''} vs ${row.teamB?.teamName ?? ''}`,
+        teams: [row.teamA?.teamName, row.teamB?.teamName].filter(Boolean),
+        date: localDate,
+      }, localMatches, teams).local
+      return fixture && fixture.verifiedSchedule !== false && localMatchIsInLiveWindow(fixture, now) && row.matchId
+        ? [{ pageId: String(row.matchId), local: fixture }]
+        : []
+    })
+  } catch {
+    // The results page below can still provide completed NPL scores if the live index is unavailable.
+  }
+
+  const liveIds = new Set(liveCandidates.map((candidate) => candidate.local.id))
   const knownMatches = (previousPayload?.matches ?? [])
     .filter((match) =>
       !['completed', 'abandoned', 'postponed'].includes(match.status) &&
       (match.status === 'live' || match.innings?.length) &&
       match.khelnowMatchPageId &&
-      !candidateIds.has(match.matchId),
+      !liveIds.has(match.matchId),
     )
     .flatMap((match) => {
       const local = localMatches.find((row) => row.id === match.matchId)
       return local ? [{ pageId: match.khelnowMatchPageId, local }] : []
     })
 
-  for (const { pageId, local } of [...candidates, ...knownMatches]) {
-    const detailHtml = await fetchText(`${KHELNOW_MATCH_PAGE}${encodeURIComponent(pageId)}`, fetchImpl)
-    const data = matchDataFromPage(extractPageProps(detailHtml))
-    const mapped = mapKhelNowMatch(data, local, teams, players)
-    if (!mapped) continue
-    mapped.match.khelnowMatchPageId = pageId
-    return {
-      matches: [mapped.match],
-      scorecards: mapped.scorecards,
-      fetchedAt: new Date().toISOString(),
+  const liveMatches = []
+  let liveScorecards = null
+  for (const { pageId, local } of [...liveCandidates, ...knownMatches]) {
+    try {
+      const detailHtml = await fetchText(`${KHELNOW_MATCH_PAGE}${encodeURIComponent(pageId)}`, fetchImpl)
+      const data = matchDataFromPage(extractPageProps(detailHtml))
+      const mapped = mapKhelNowMatch(data, local, teams, players)
+      if (!mapped) continue
+      mapped.match.khelnowMatchPageId = pageId
+      liveMatches.push(mapped.match)
+      liveScorecards = mapped.scorecards
+    } catch {
+      // Keep the prior score and continue to the competition results page.
     }
   }
 
-  return { matches: [], scorecards: { batting: [], bowling: [], fielding: [] }, fetchedAt: new Date().toISOString() }
+  const previousCompleted = (previousPayload?.matches ?? [])
+    .filter((match) => ['completed', 'abandoned', 'postponed'].includes(match.status))
+  const previousScorecards = previousPayload?.scorecards
+
+  if (liveMatches.length) {
+    const currentIds = new Set(liveMatches.map((match) => match.matchId))
+    const matches = [...previousCompleted.filter((match) => !currentIds.has(match.matchId)), ...liveMatches]
+    return {
+      matches,
+      scorecards: mergeScorecards(previousScorecards, liveScorecards),
+      fetchedAt: new Date(now).toISOString(),
+    }
+  }
+
+  const resultsHtml = await fetchText(KHELNOW_NPL_RESULTS, fetchImpl)
+  const resultsProps = extractPageProps(resultsHtml)
+  const scheduleMatches = resultsProps.scheduleData?.data?.matches ?? []
+  const completedMatches = scheduleMatches
+    .map((row) => mapKhelNowScheduleMatch(row, localMatches, teams))
+    .filter(Boolean)
+  const completedIds = new Set(completedMatches.map((match) => match.matchId))
+  const matches = [
+    ...previousCompleted.filter((match) => !completedIds.has(match.matchId)),
+    ...completedMatches,
+  ]
+
+  let recentScorecards = null
+  const latestCompleted = scheduleMatches
+    .filter((row) => Number(row.status) === 2 || /\bcompleted\b|\bwon by\b/i.test(`${row.status_str ?? ''} ${row.status_note ?? ''} ${row.result ?? ''}`))
+    .sort((a, b) => Number(b.timestamp_start ?? 0) - Number(a.timestamp_start ?? 0))[0]
+  if (latestCompleted?.id) {
+    try {
+      const detailHtml = await fetchText(`${KHELNOW_MATCH_PAGE}${encodeURIComponent(latestCompleted.id)}`, fetchImpl)
+      const detailed = mapKhelNowMatch(matchDataFromPage(extractPageProps(detailHtml)),
+        localMatches.find((match) => matches.some((row) => row.matchId === match.id && row.khelnowMatchPageId === String(latestCompleted.id))),
+        teams, players)
+      recentScorecards = detailed?.scorecards ?? null
+    } catch {
+      // The completed scores and result from the schedule remain usable without the detailed scorecard.
+    }
+  }
+
+  return {
+    matches,
+    scorecards: mergeScorecards(previousScorecards, recentScorecards),
+    fetchedAt: new Date(now).toISOString(),
+  }
 }
 
 export const khelnowInternals = { extractPageProps, mapKhelNowMatch, scoreParts, rowsForMatchInsight }
