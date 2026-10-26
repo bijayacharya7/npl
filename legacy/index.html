@@ -1,0 +1,241 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="theme-color" content="#101827">
+  <meta name="description" content="Follow Nepal Premier League cricket, make match predictions, and compete with fellow fans.">
+  <title>NPL Fan Zone | Nepal Cricket Community</title>
+  <link rel="stylesheet" href="style.css">
+  <script src="script.js" defer></script>
+</head>
+<body>
+  <header class="navbar">
+    <a href="#" class="brand">
+      <span class="brand-icon">🏏</span>
+      <span>NPL <strong>FAN ZONE</strong></span>
+    </a>
+
+    <button class="menu-toggle" id="menuToggle"
+      aria-label="Toggle navigation" aria-expanded="false">
+      ☰
+    </button>
+
+    <nav class="nav-links" id="navLinks">
+      <a href="#home">Home</a>
+      <a href="#fixtures">Fixtures</a>
+      <a href="#standings">Standings</a>
+      <a href="#predictions">Predictions</a>
+    </nav>
+
+    <a href="#predictions" class="nav-cta">Play Now ↗</a>
+  </header>
+
+  <main>
+    <section class="hero" id="home">
+      <div class="hero-content">
+        <span class="eyebrow"><span class="live-dot"></span>
+          NEPAL'S CRICKET COMMUNITY
+        </span>
+
+        <h1>MORE THAN A GAME.<br>
+          <span>IT'S OUR PASSION.</span>
+        </h1>
+
+        <p>
+          Follow the action. Predict the winners.
+          Prove your cricket knowledge.
+          Welcome to your NPL fan zone.
+        </p>
+
+        <div class="hero-actions">
+          <a href="#predictions" class="btn btn-primary">
+            Make Your Prediction →
+          </a>
+          <a href="#fixtures" class="btn btn-outline">
+            Explore Matches
+          </a>
+        </div>
+
+        <div class="hero-stats">
+          <div>
+            <strong>01</strong>
+            <span>Fan community</span>
+          </div>
+          <div>
+            <strong>∞</strong>
+            <span>Cricket passion</span>
+          </div>
+          <div>
+            <strong>100%</strong>
+            <span>Fan spirit</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="hero-art" aria-label="Cricket illustration">
+        <div class="orbit orbit-one"></div>
+        <div class="orbit orbit-two"></div>
+        <div class="cricket-ball">🏏</div>
+        <div class="art-label">
+          <span>THE GAME IS ON</span>
+          <strong>NEPAL, LET'S PLAY!</strong>
+        </div>
+      </div>
+    </section>
+
+    <section class="section" id="featured">
+      <div class="section-heading">
+        <div>
+          <span class="eyebrow">DON'T MISS THE ACTION</span>
+          <h2>Featured Match <span class="accent">.</span></h2>
+        </div>
+        <span class="status-badge">DEMO MATCH</span>
+      </div>
+
+      <article class="match-card">
+        <div class="match-meta">
+          <span>🏆 Nepal Premier League</span>
+          <span>Sample data · Not a real fixture</span>
+        </div>
+
+        <div class="match-versus">
+          <div class="team">
+            <div class="team-logo">🔴</div>
+            <h3>Team A</h3>
+            <span>Home team</span>
+          </div>
+
+          <div class="versus">
+            <span>VS</span>
+            <small>Upcoming</small>
+          </div>
+
+          <div class="team">
+            <div class="team-logo">🔵</div>
+            <h3>Team B</h3>
+            <span>Away team</span>
+          </div>
+        </div>
+
+        <div class="match-footer">
+          <span>🏏 Who will win?</span>
+          <a href="#predictions" class="text-link">
+            Predict now →
+          </a>
+        </div>
+      </article>
+    </section>
+
+    <section class="section" id="predictions">
+      <div class="section-heading">
+        <div>
+          <span class="eyebrow">TRUST YOUR CRICKET INSTINCT</span>
+          <h2>Make Your Pick <span class="accent">.</span></h2>
+        </div>
+      </div>
+
+      <div class="prediction-panel">
+        <div>
+          <h3>Who wins this demo match?</h3>
+          <p>Choose a team and submit your prediction.</p>
+        </div>
+
+        <div class="prediction-options">
+          <button class="pick-btn" data-team="Team A">🔴 Team A</button>
+          <button class="pick-btn" data-team="Team B">🔵 Team B</button>
+        </div>
+
+        <button class="btn btn-primary submit-pick" id="submitPick" disabled>
+          Submit Prediction
+        </button>
+
+        <p id="predictionMessage" class="feedback" aria-live="polite">
+          Select a team to get started.
+        </p>
+        <p class="small-note">
+          Demo only. Predictions are not saved to an account or server yet.
+        </p>
+      </div>
+    </section>
+
+    <section class="section" id="fixtures">
+      <div class="section-heading">
+        <div>
+          <span class="eyebrow">PLAN YOUR CRICKET DAYS</span>
+          <h2>Upcoming Fixtures <span class="accent">.</span></h2>
+        </div>
+        <span class="muted">Demo schedule</span>
+      </div>
+
+      <div class="fixture-list">
+        <article class="fixture-row">
+          <div class="fixture-date"><strong>01</strong><span>MATCH</span></div>
+          <div class="fixture-teams">
+            <strong>Team A <span>vs</span> Team B</strong>
+            <small>Sample fixture — date to be confirmed</small>
+          </div>
+          <span class="fixture-tag">DEMO</span>
+        </article>
+
+        <article class="fixture-row">
+          <div class="fixture-date"><strong>02</strong><span>MATCH</span></div>
+          <div class="fixture-teams">
+            <strong>Team C <span>vs</span> Team D</strong>
+            <small>Sample fixture — date to be confirmed</small>
+          </div>
+          <span class="fixture-tag">DEMO</span>
+        </article>
+
+        <article class="fixture-row">
+          <div class="fixture-date"><strong>03</strong><span>MATCH</span></div>
+          <div class="fixture-teams">
+            <strong>Team E <span>vs</span> Team F</strong>
+            <small>Sample fixture — date to be confirmed</small>
+          </div>
+          <span class="fixture-tag">DEMO</span>
+        </article>
+      </div>
+    </section>
+
+    <section class="section lower-grid">
+      <div id="standings" class="info-card">
+        <span class="eyebrow">THE RACE TO THE TOP</span>
+        <h2>Team Standings</h2>
+        <p>Official standings will appear here once we connect verified match data.</p>
+        <div class="placeholder">📊 Standings coming in the next milestone</div>
+      </div>
+
+      <div id="leaderboard" class="info-card">
+        <span class="eyebrow">WHO KNOWS CRICKET BEST?</span>
+        <h2>Fan Leaderboard</h2>
+        <p>Your future ranking will be based on correct predictions.</p>
+        <div class="placeholder">🏆 Create your fan ranking in a future update</div>
+      </div>
+    </section>
+
+    <section class="sponsor-section">
+      <span class="eyebrow">GROW WITH THE GAME</span>
+      <h2>Put Your Brand in the Game.</h2>
+      <p>We plan to work with local businesses to bring more value to cricket fans.</p>
+      <a class="btn btn-primary" href="mailto:hello@example.com?subject=NPL%20Fan%20Zone%20Sponsorship">
+        Explore Sponsorship
+      </a>
+      <p class="small-note">Demo contact address — replace before publishing.</p>
+    </section>
+  </main>
+
+  <footer class="footer">
+    <a href="#home" class="brand">
+      <span class="brand-icon">🏏</span>
+      <span>NPL <strong>FAN ZONE</strong></span>
+    </a>
+    <p>Built for the love of Nepali cricket.</p>
+    <small>
+      Independent fan project. Not affiliated with the official NPL.
+    </small>
+    <small>© <span id="year"></span> NPL Fan Zone</small>
+  </footer>
+</body>
+</html>

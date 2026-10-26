@@ -1,0 +1,12 @@
+project_id = "npl-fan-zone"
+
+[auth]
+enable_signup = false
+enable_anonymous_sign_ins = false
+
+[auth.email]
+enable_signup = false
+
+[db.seed]
+enabled = true
+sql_paths = ["./seed.sql"]
