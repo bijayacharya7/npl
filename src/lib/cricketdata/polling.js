@@ -1,4 +1,6 @@
-const LIVE_POLL_MS = 60_000
+// Cricket providers update live scoreboards frequently; poll the server-side
+// provider aggregator at a modest cadence to keep UI and API usage controlled.
+const LIVE_POLL_MS = 30_000
 const IDLE_POLL_MS = 10 * 60_000
 const LIVE_WINDOW_BEFORE_MS = 30 * 60_000
 const LIVE_WINDOW_AFTER_MS = 4 * 60 * 60_000

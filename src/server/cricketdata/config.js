@@ -1,4 +1,4 @@
-/** Server-only CricketData.org settings. Never import this from React pages. */
+/** Server-only cricket data provider settings. Never import from React pages. */
 
 export const PROVIDER = {
   name: 'CricketData.org',
@@ -32,6 +32,8 @@ function envNumber(env, name, fallback) {
 export function getConfig(env = process.env) {
   return {
     apiKey: String(env.CRICKETDATA_API_KEY ?? '').trim(),
+    cricbuzzApiKey: String(env.CRICBUZZ_RAPIDAPI_KEY ?? env.RAPIDAPI_KEY ?? '').trim(),
+    // Conservative default; increase only to the purchased provider allowance.
     dailyLimit: envNumber(env, 'CRICKETDATA_DAILY_LIMIT', 80),
     providerLimit: envNumber(env, 'CRICKETDATA_PROVIDER_LIMIT', 100),
     ttl: {
@@ -40,7 +42,7 @@ export function getConfig(env = process.env) {
       results: envNumber(env, 'CRICKETDATA_TTL_RESULTS_MS', 12 * hour),
       playerStats: envNumber(env, 'CRICKETDATA_TTL_STATS_MS', 12 * hour),
       points: envNumber(env, 'CRICKETDATA_TTL_POINTS_MS', 60 * minute),
-      live: envNumber(env, 'CRICKETDATA_TTL_LIVE_MS', 4 * minute),
+      live: envNumber(env, 'CRICKETDATA_TTL_LIVE_MS', 30 * 1000),
       seriesSearch: envNumber(env, 'CRICKETDATA_TTL_SEARCH_MS', 24 * hour),
     },
     requestTimeoutMs: envNumber(env, 'CRICKETDATA_TIMEOUT_MS', 12000),

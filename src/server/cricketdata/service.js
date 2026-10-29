@@ -3,6 +3,7 @@ import { TEAMS } from '../../data/teams.js'
 import { PLAYERS } from '../../data/players.js'
 import { DATASETS, getConfig, msUntilUtcMidnight, PROVIDER } from './config.js'
 import { createProviderClient } from './client.js'
+import { fetchCricbuzzNplLive } from './cricbuzz.js'
 import { fetchKhelNowNplLive } from './khelnow.js'
 import {
   isNpl2026SeriesName,
@@ -17,9 +18,12 @@ import { createMemoryStore, createStore } from './store.js'
 
 const inflight = new Map()
 const minute = 60 * 1000
-const KHELNOW_CACHE_MS = 55 * 1000
-const KHELNOW_RETENTION_MS = 365 * 24 * 60 * 60 * 1000
-const KHELNOW_CACHE_KEY = 'khelnow_npl_2026'
+const LIVE_SCORECARD_TTL_MS = 30 * 1000
+const CRICBUZZ_CACHE_KEY = 'cricbuzz_npl_live'
+const CRICBUZZ_CACHE_MS = 30 * 1000
+const KHELNOW_CACHE_KEY = 'khelnow_npl_matches'
+const KHELNOW_CACHE_MS = 5 * minute
+const KHELNOW_LIVE_CACHE_MS = 30 * 1000
 
 function nplSeasonIsActive(matches, now) {
   const starts = matches.map((match) => new Date(match.startTime).getTime()).filter(Number.isFinite)
@@ -31,10 +35,10 @@ function emptyFeed(partial = {}) {
   return {
     overlay: { matches: [], scorecards: { batting: [], bowling: [], fielding: [] }, squads: [] },
     meta: {
-      provider: PROVIDER.name,
+      provider: 'Sportmonks Cricket API',
       available: false,
       coverage: 'none',
-      message: 'CricketData.org does not currently list Nepal Premier League 2026.',
+      message: 'Live scores are not connected. Configure SPORTMONKS_API_TOKEN on the server to enable authorized NPL live updates.',
       fetchedAt: null,
       expiresAt: null,
       liveFresh: false,
@@ -88,51 +92,59 @@ export function createCricketdataService(options = {}) {
   const teams = options.teams ?? TEAMS
   const players = options.players ?? PLAYERS
   const nowFn = options.now ?? (() => new Date())
-  const khelnowEnabled = options.khelnowEnabled ?? process.env.NODE_ENV !== 'test'
-  let khelnowCache = null
-  let khelnowInflight = null
 
-  async function getKhelNowLive() {
-    if (!khelnowEnabled) return null
+  async function getCricbuzzLive() {
+    if (!config.cricbuzzApiKey) return null
     const now = nowFn()
-    const stored = await readCache(KHELNOW_CACHE_KEY)
-    const storedAt = stored?.payload?.fetchedAt ? new Date(stored.payload.fetchedAt).getTime() : 0
-    const previousPayload = storedAt && now.getTime() - storedAt <= KHELNOW_RETENTION_MS
-      ? stored.payload
-      : null
-    const hasUnfinishedCachedMatch = previousPayload?.matches?.some((match) =>
-      !['completed', 'abandoned', 'postponed'].includes(match.status) &&
-      (match.status === 'live' || match.innings?.length),
-    )
-    if (storedAt && now.getTime() - storedAt <= KHELNOW_CACHE_MS && previousPayload) return previousPayload
-    if (!nplHasLiveWindow(localMatches, now.getTime()) && !hasUnfinishedCachedMatch && !nplSeasonIsActive(localMatches, now.getTime())) return previousPayload
-    if (khelnowCache && khelnowCache.expiresAt > nowFn().getTime()) return khelnowCache.payload
-    if (khelnowInflight) return khelnowInflight
+    const cached = await readCache(CRICBUZZ_CACHE_KEY)
+    if (cached?.payload && cached.expiresAt && new Date(cached.expiresAt).getTime() > now.getTime()) {
+      return cached.payload
+    }
 
-    khelnowInflight = fetchKhelNowNplLive({
-      localMatches, teams, players, previousPayload, now: now.getTime(), fetchImpl: options.khelnowFetchImpl,
+    return singleFlight(CRICBUZZ_CACHE_KEY, async () => {
+      const payload = await fetchCricbuzzNplLive({
+        apiKey: config.cricbuzzApiKey,
+        localMatches,
+        teams,
+        players,
+        fetchImpl: options.fetchImpl,
+        now: now.getTime(),
+      })
+      await writeCache(CRICBUZZ_CACHE_KEY, DATASETS.CURRENT_MATCHES, payload, CRICBUZZ_CACHE_MS, 'ok')
+      return payload
+    }).catch(async (error) => {
+      await store.addEvent({ dataset: DATASETS.CURRENT_MATCHES, action: 'cricbuzz-error', detail: error.message, ok: false })
+      return cached?.payload ?? null
     })
-      .then(async (payload) => {
-        const result = payload?.matches?.length || !previousPayload?.matches?.length ? payload : previousPayload
-        try {
-          await writeCache(KHELNOW_CACHE_KEY, DATASETS.CURRENT_MATCHES, result, KHELNOW_RETENTION_MS, 'ok')
-        } catch (error) {
-          try {
-            await store.addEvent({ dataset: DATASETS.CURRENT_MATCHES, action: 'cache-error', detail: `KhelNow score cache: ${error.message}`, ok: false })
-          } catch {
-            // The live response remains usable if the optional cache is unavailable.
-          }
-        }
-        khelnowCache = { payload: result, expiresAt: nowFn().getTime() + KHELNOW_CACHE_MS }
-        return result
+  }
+
+  async function getKhelNowMatches() {
+    const enabled = options.khelnowEnabled === true ||
+      (options.khelnowEnabled !== false && !options.client)
+    if (!enabled) return null
+    const now = nowFn()
+    const cached = await readCache(KHELNOW_CACHE_KEY)
+    if (cached?.payload && cached.expiresAt && new Date(cached.expiresAt).getTime() > now.getTime()) {
+      return cached.payload
+    }
+    return singleFlight(KHELNOW_CACHE_KEY, async () => {
+      const payload = await fetchKhelNowNplLive({
+        localMatches,
+        teams,
+        players,
+        previousPayload: cached?.payload ?? null,
+        now: now.getTime(),
+        fetchImpl: options.khelnowFetchImpl ?? options.fetchImpl,
+        fetchAll: true,
       })
-      .catch(async (error) => {
-        await store.addEvent({ dataset: DATASETS.CURRENT_MATCHES, action: 'fallback-error', detail: `KhelNow live page: ${error.message}`, ok: false })
-        khelnowCache = { payload: previousPayload, expiresAt: nowFn().getTime() + KHELNOW_CACHE_MS }
-        return previousPayload
-      })
-      .finally(() => { khelnowInflight = null })
-    return khelnowInflight
+      const hasLiveMatch = payload?.matches?.some((match) => match.status === 'live')
+      const ttl = hasLiveMatch ? KHELNOW_LIVE_CACHE_MS : KHELNOW_CACHE_MS
+      await writeCache(KHELNOW_CACHE_KEY, DATASETS.CURRENT_MATCHES, payload, ttl, 'ok')
+      return payload
+    }).catch(async (error) => {
+      await store.addEvent({ dataset: DATASETS.CURRENT_MATCHES, action: 'khelnow-error', detail: error.message, ok: false })
+      return cached?.payload ?? null
+    })
   }
 
   const onQuotaInfo = async (info) => {
@@ -277,13 +289,16 @@ export function createCricketdataService(options = {}) {
 
   function ttlFor(dataset, payload) {
     if (dataset === DATASETS.SERIES_SEARCH) return config.ttl.seriesSearch
-    if (dataset === DATASETS.SERIES_INFO) return payload?.hasLive ? config.ttl.live : config.ttl.fixtures
+    if (dataset === DATASETS.SERIES_INFO) return payload?.hasLive ? LIVE_SCORECARD_TTL_MS : config.ttl.fixtures
     if (dataset === DATASETS.CURRENT_MATCHES) {
       const scheduledLiveWindow = nplHasLiveWindow(localMatches, nowFn().getTime())
       return payload?.hasNplLive || scheduledLiveWindow ? config.ttl.live : config.ttl.fixtures
     }
     if (dataset === DATASETS.MATCH_INFO) return config.ttl.live
-    if (dataset === DATASETS.MATCH_SCORECARD) return config.ttl.playerStats
+    if (dataset === DATASETS.MATCH_SCORECARD) {
+      const liveMatches = payload?.liveMatches ?? 0
+      return liveMatches > 0 ? LIVE_SCORECARD_TTL_MS : config.ttl.playerStats
+    }
     if (dataset === DATASETS.SERIES_SQUADS) return config.ttl.teams
     return config.ttl.fixtures
   }
@@ -368,7 +383,7 @@ export function createCricketdataService(options = {}) {
       const info = (await readCache(DATASETS.SERIES_INFO))?.payload
       const current = (await readCache(DATASETS.CURRENT_MATCHES))?.payload
       const candidates = [...(current?.matches ?? []), ...(info?.matches ?? [])].filter(
-        (row) => row.fantasyEnabled && row.providerMatchId && ['completed', 'live'].includes(row.status),
+        (row) => row.providerMatchId && ['completed', 'live'].includes(row.status),
       )
       const unique = []
       const seen = new Set()
@@ -378,7 +393,9 @@ export function createCricketdataService(options = {}) {
         unique.push(row)
       }
       const completedUnfetched = unique.filter((row) => row.status === 'completed').slice(0, 1)
-      const liveOnes = unique.filter((row) => row.status === 'live').slice(0, 1)
+      // Each currently live NPL match needs its own scorecard request so a
+      // double-header (or overlapping fixtures) updates for every team.
+      const liveOnes = unique.filter((row) => row.status === 'live')
       const toFetch = liveOnes.length ? liveOnes : completedUnfetched
       const scorecards = { batting: [], bowling: [], fielding: [] }
       let supported = false
@@ -391,7 +408,13 @@ export function createCricketdataService(options = {}) {
         scorecards.bowling.push(...mapped.bowling)
         scorecards.fielding.push(...mapped.fielding)
       }
-      return { status: toFetch.length ? 'ok' : 'skipped', scorecards, supported, fetched: toFetch.length }
+      return {
+        status: toFetch.length ? 'ok' : 'skipped',
+        scorecards,
+        supported,
+        fetched: toFetch.length,
+        liveMatches: liveOnes.length,
+      }
     }
 
     if (dataset === DATASETS.SERIES_SQUADS) {
@@ -463,13 +486,18 @@ export function createCricketdataService(options = {}) {
     const current = (await readCache(DATASETS.CURRENT_MATCHES))?.payload
     const liveApi = [...(info?.matches ?? []), ...(current?.matches ?? [])].some((row) => row.status === 'live')
     const wantCards = [...(info?.matches ?? []), ...(current?.matches ?? [])].some(
-      (row) => row.fantasyEnabled && ['completed', 'live'].includes(row.status),
+      (row) => row.providerMatchId && ['completed', 'live'].includes(row.status),
     )
     if (liveApi && wantCards) {
-      try {
-        await refreshDataset(DATASETS.MATCH_SCORECARD)
-      } catch {
-        // Scores remain available from the match feed when scorecards fail.
+      const cards = await readCache(DATASETS.MATCH_SCORECARD)
+      // Keep live scorecards on a short TTL so a visitor poll does not reuse a
+      // full match-statistics cache while play is ongoing.
+      if (!isFresh(cards, now) || cards.payload?.liveMatches > 0) {
+        try {
+          await refreshDataset(DATASETS.MATCH_SCORECARD)
+        } catch {
+          // Scores remain available from the match feed when scorecards fail.
+        }
       }
     } else if (wantCards) {
       const cards = await readCache(DATASETS.MATCH_SCORECARD)
@@ -483,30 +511,43 @@ export function createCricketdataService(options = {}) {
     }
   }
 
-  async function buildFeed(khelnow = null) {
+  async function buildFeed(cricbuzz = null) {
     const search = (await readCache(DATASETS.SERIES_SEARCH))?.payload
     const info = (await readCache(DATASETS.SERIES_INFO))?.payload
     const current = (await readCache(DATASETS.CURRENT_MATCHES))?.payload
     const cards = (await readCache(DATASETS.MATCH_SCORECARD))?.payload
+    const khelnow = await getKhelNowMatches()
     const caches = await store.listCache()
     const newest = caches
       .filter((row) => row.fetchedAt)
       .sort((a, b) => String(b.fetchedAt).localeCompare(String(a.fetchedAt)))[0]
 
-    const overlays = mergeOverlays(info?.matches, current?.matches, khelnow?.matches)
+    const overlays = mergeOverlays(info?.matches, current?.matches, khelnow?.matches, cricbuzz?.matches)
     const liveIds = overlays.filter((row) => row.status === 'live').map((row) => row.matchId)
     const currentRow = await readCache(DATASETS.CURRENT_MATCHES)
     const cricketDataLiveFresh =
       liveIds.length > 0 &&
-      currentRow?.fetchedAt &&
-      nowFn().getTime() - new Date(currentRow.fetchedAt).getTime() <= config.ttl.live
-    const khelnowFresh = Boolean(
-      khelnow?.matches?.length &&
-      nowFn().getTime() - new Date(khelnow.fetchedAt).getTime() <= KHELNOW_CACHE_MS + 5_000,
+      (currentRow?.fetchedAt || newest?.fetchedAt) &&
+      nowFn().getTime() - new Date(currentRow?.fetchedAt || newest.fetchedAt).getTime() <= config.ttl.live
+    const cricbuzzFresh = Boolean(
+      cricbuzz?.matches?.length &&
+      nowFn().getTime() - new Date(cricbuzz.fetchedAt).getTime() <= CRICBUZZ_CACHE_MS + 5_000,
     )
-    const khelnowLiveFresh = Boolean(khelnowFresh && khelnow.matches.some((row) => row.status === 'live'))
-    const liveFresh = Boolean(cricketDataLiveFresh || khelnowLiveFresh)
+    const cricbuzzLiveFresh = Boolean(cricbuzzFresh && cricbuzz.matches.some((row) => row.status === 'live'))
+    const khelnowLive = Boolean(khelnow?.matches?.some((row) => row.status === 'live'))
+    const khelnowFresh = Boolean(
+      khelnow?.fetchedAt &&
+      nowFn().getTime() - new Date(khelnow.fetchedAt).getTime() <=
+        (khelnowLive ? KHELNOW_LIVE_CACHE_MS : KHELNOW_CACHE_MS),
+    )
+    const khelnowLiveFresh = Boolean(khelnowFresh && khelnowLive)
+    const liveFresh = Boolean(cricketDataLiveFresh || cricbuzzLiveFresh || khelnowLiveFresh)
     const liveMatchIds = liveFresh ? liveIds : []
+    if (cricbuzzLiveFresh) {
+      for (const row of cricbuzz.matches) {
+        if (row.status === 'live' && !liveMatchIds.includes(row.matchId)) liveMatchIds.push(row.matchId)
+      }
+    }
     if (khelnowLiveFresh) {
       for (const row of khelnow.matches) {
         if (row.status === 'live' && !liveMatchIds.includes(row.matchId)) liveMatchIds.push(row.matchId)
@@ -514,31 +555,41 @@ export function createCricketdataService(options = {}) {
     }
 
     const series = info?.series ?? search?.series ?? null
+    const hasCricbuzzData = Boolean(cricbuzz?.matches?.length)
     const hasKhelNowData = Boolean(khelnow?.matches?.length)
-    const available = Boolean(series || hasKhelNowData)
+    const available = Boolean(series || hasCricbuzzData || hasKhelNowData)
     const hasMapped = overlays.length > 0
     const hasCompleted = overlays.some((row) => row.status === 'completed' && row.result)
     const scorecards = {
-      batting: khelnow?.scorecards?.batting?.length ? khelnow.scorecards.batting : cards?.scorecards?.batting ?? [],
-      bowling: khelnow?.scorecards?.bowling?.length ? khelnow.scorecards.bowling : cards?.scorecards?.bowling ?? [],
-      fielding: khelnow?.scorecards?.fielding?.length ? khelnow.scorecards.fielding : cards?.scorecards?.fielding ?? [],
+      batting: cricbuzz?.scorecards?.batting?.length
+        ? cricbuzz.scorecards.batting
+        : khelnow?.scorecards?.batting?.length ? khelnow.scorecards.batting : cards?.scorecards?.batting ?? [],
+      bowling: cricbuzz?.scorecards?.bowling?.length
+        ? cricbuzz.scorecards.bowling
+        : khelnow?.scorecards?.bowling?.length ? khelnow.scorecards.bowling : cards?.scorecards?.bowling ?? [],
+      fielding: cricbuzz?.scorecards?.fielding?.length
+        ? cricbuzz.scorecards.fielding
+        : khelnow?.scorecards?.fielding?.length ? khelnow.scorecards.fielding : cards?.scorecards?.fielding ?? [],
     }
     const hasScorecards = Boolean(scorecards.batting.length || scorecards.bowling.length)
     const quota = await quotaSnapshot()
 
     let message
-    if (khelnowFresh) {
-      message = `${khelnowLiveFresh ? 'Live scorecard' : 'Match scorecard'} updated from KhelNow${series ? ' with CricketData.org coverage' : ''}.`
-    } else if (hasKhelNowData) {
-      message = 'Showing the most recent KhelNow scorecard; a newer update is not available yet.'
-    } else if (!config.apiKey) {
-      message = 'Set CRICKETDATA_API_KEY on the server to enable CricketData.org.'
+    if (khelnowLiveFresh) {
+      const liveCount = khelnow.matches.filter((row) => row.status === 'live').length
+      message = `Live NPL scores from KhelNow (${liveCount} live match${liveCount === 1 ? '' : 'es'}).`
+    } else if (cricbuzzLiveFresh) {
+      message = `Live NPL scores from Cricbuzz (${cricbuzz.liveMatches} live match${cricbuzz.liveMatches === 1 ? '' : 'es'}).`
+    } else if (cricbuzzFresh) {
+      message = 'NPL scores updated from Cricbuzz.'
+    } else if (!config.cricbuzzApiKey && !hasKhelNowData) {
+      message = 'Live scores are not connected. Set CRICKETDATA_API_KEY or configure a live-score provider on the server.'
     } else if (hasMapped) {
-      message = `Mapped ${overlays.length} NPL 2026 match${overlays.length === 1 ? '' : 'es'}${series?.name ? ` from ${series.name}` : ' from the current-match feed'}.`
+      message = `Mapped ${overlays.length} NPL 2026 match${overlays.length === 1 ? '' : 'es'}${series?.name ? ` from ${series.name}` : ' from Cricbuzz'}.`
     } else if (quota.lastError) {
       message = 'CricketData.org could not be reached. Live scores are unavailable until the provider connection recovers.'
     } else if (!available) {
-      message = 'CricketData.org has no Nepal Premier League 2026 series in its catalogue yet. Fixtures and scores on this site stay on the verified local schedule and admin entries.'
+      message = 'No NPL live scores are available from Cricbuzz right now.'
     } else {
       message = `${series.name} was found, but matches could not be mapped onto the local NPL 2026 fixture list.`
     }
@@ -550,7 +601,7 @@ export function createCricketdataService(options = {}) {
         squads: info?.squads ?? [],
       },
       meta: {
-        provider: hasKhelNowData ? 'KhelNow live scoreboard' : PROVIDER.name,
+        provider: 'Cricbuzz',
         available,
         coverage: available ? (hasMapped ? 'partial' : 'series-only') : 'none',
         message,
@@ -558,7 +609,7 @@ export function createCricketdataService(options = {}) {
         expiresAt: newest?.expiresAt ?? null,
         liveFresh,
         liveMatchIds,
-        lastUpdatedLabel: hasKhelNowData ? khelnow.fetchedAt : newest?.fetchedAt ?? null,
+        lastUpdatedLabel: cricbuzz?.fetchedAt ?? newest?.fetchedAt ?? null,
         quota,
         series,
       },
@@ -586,8 +637,8 @@ export function createCricketdataService(options = {}) {
           await store.addEvent({ dataset: DATASETS.FEED, action: 'error', detail: error.message, ok: false })
         }
       }
-      const khelnow = await getKhelNowLive()
-      const feed = await buildFeed(khelnow)
+      const cricbuzz = await getCricbuzzLive()
+      const feed = await buildFeed(cricbuzz)
       await writeCache(DATASETS.FEED, DATASETS.FEED, feed, config.ttl.live, 'ok')
       return feed
     },
@@ -606,10 +657,12 @@ export function createCricketdataService(options = {}) {
     async adminStatus() {
       const caches = await store.listCache()
       const events = await store.listEvents()
-      const feed = await buildFeed(await getKhelNowLive())
+      const cricbuzz = await getCricbuzzLive()
+      const feed = await buildFeed(cricbuzz)
       return {
         provider: PROVIDER,
         keyConfigured: Boolean(config.apiKey),
+        cricbuzzConfigured: Boolean(config.cricbuzzApiKey),
         store: store.kind,
         quota: await quotaSnapshot(),
         caches: caches.map((row) => ({

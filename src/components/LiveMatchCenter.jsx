@@ -272,7 +272,7 @@ export function LiveMatchCenter({ match, teamsById }) {
         <div
           style={{
             display: 'grid',
-            gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))',
+            gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 280px), 1fr))',
             gap: '1.5rem',
             alignItems: 'center',
           }}
@@ -418,7 +418,7 @@ export function LiveMatchCenter({ match, teamsById }) {
           style={{
             marginTop: '1.2rem',
             display: 'grid',
-            gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))',
+            gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 280px), 1fr))',
             gap: '1rem',
           }}
         >

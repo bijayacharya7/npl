@@ -45,7 +45,7 @@ export default function ArticleDetail() {
       <article className="container-narrow" style={{ paddingInline: 0 }}>
         <div className="article-meta" style={{ marginBottom: '0.7rem' }}>
           <span className="badge badge-gold">{article.category}</span>
-          {article.isSample && <span className="badge badge-muted">Sample content</span>}
+          {article.source && <span className="badge badge-muted">Sourced</span>}
           {article.status === 'draft' && <span className="badge badge-warn">Draft preview</span>}
         </div>
 
@@ -58,12 +58,19 @@ export default function ArticleDetail() {
         </p>
 
         {article.coverImageUrl ? (
-          <img
-            className="article-cover"
-            src={article.coverImageUrl}
-            alt=""
-            style={{ aspectRatio: '16 / 7', marginBottom: '1.6rem' }}
-          />
+          <>
+            <img
+              className="article-cover"
+              src={article.coverImageUrl}
+              alt=""
+              style={{ aspectRatio: '16 / 7', marginBottom: '1.6rem' }}
+            />
+            {article.imageCredit && (
+              <p className="tiny muted" style={{ marginTop: '-1.2rem', marginBottom: '1.2rem' }}>
+                Image: {article.imageCredit}
+              </p>
+            )}
+          </>
         ) : (
           <div className="article-placeholder" style={{ aspectRatio: '16 / 7', marginBottom: '1.6rem' }}>
             No cover image — add a licensed image in the admin dashboard
@@ -101,11 +108,14 @@ export default function ArticleDetail() {
           </div>
         )}
 
-        {article.isSample && (
-          <div className="notice notice-gold" style={{ marginTop: '1.2rem' }}>
+        {article.source && (
+          <div className="notice" style={{ marginTop: '1.2rem' }}>
             <span className="small">
-              This is sample editorial content for the development build. Replace it with real, attributed
-              reporting before launch. NPL Fan Zone does not publish invented quotes or unverified news.
+              This article is a summary by NPL Fan Zone. Read the full report at{' '}
+              <a className="text-link" href={article.source.url} target="_blank" rel="noreferrer noopener">
+                {article.source.label}
+              </a>
+              .
             </span>
           </div>
         )}

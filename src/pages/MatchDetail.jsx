@@ -245,7 +245,7 @@ export default function MatchDetail() {
                         </div>
                       ) : (
                         <div className="table-wrap">
-                          <table className="data-table">
+                          <table className="data-table stack-mobile-table">
                             <caption className="sr-only">
                               Batting and bowling details for {battingTeam?.name ?? 'this innings'}
                             </caption>
@@ -273,21 +273,21 @@ export default function MatchDetail() {
                             <tbody>
                               {rows.map((row) => (
                                 <tr key={row.id ?? row.playerId}>
-                                  <td>
+                                  <td data-label="Batter">
                                     {playersById[row.playerId] ? (
                                       <Link to={`/players/${row.playerId}`} style={{ fontWeight: 600 }}>
                                         {playersById[row.playerId].name}
                                       </Link>
                                     ) : <strong>{row.playerName ?? row.playerId}</strong>}
                                   </td>
-                                  <td className="num">{row.runs}</td>
-                                  <td className="num">{row.balls}</td>
-                                  <td className="num">{row.fours}</td>
-                                  <td className="num">{row.sixes}</td>
-                                  <td className="num">
+                                  <td data-label="Runs" className="num">{row.runs}</td>
+                                  <td data-label="Balls" className="num">{row.balls}</td>
+                                  <td data-label="Fours" className="num">{row.fours}</td>
+                                  <td data-label="Sixes" className="num">{row.sixes}</td>
+                                  <td data-label="Strike rate" className="num">
                                     {row.balls > 0 ? ((row.runs / row.balls) * 100).toFixed(2) : '\u2014'}
                                   </td>
-                                  <td className="muted small">{row.out ? row.dismissal || 'out' : 'not out'}</td>
+                                  <td data-label="Dismissal" className="muted small">{row.out ? row.dismissal || 'out' : 'not out'}</td>
                                 </tr>
                               ))}
                             </tbody>
@@ -296,7 +296,7 @@ export default function MatchDetail() {
                       )}
                       {bowlers.length > 0 && (
                         <div className="table-wrap" style={{ borderLeft: 0, borderRight: 0, borderBottom: 0 }}>
-                          <table className="data-table">
+                          <table className="data-table stack-mobile-table">
                             <thead>
                               <tr>
                                 <th scope="col">Bowler</th>
@@ -320,18 +320,18 @@ export default function MatchDetail() {
                             <tbody>
                               {bowlers.map((row) => (
                                 <tr key={row.id ?? `${row.playerId}-${innings.id}`}>
-                                  <td>
+                                  <td data-label="Bowler">
                                     {playersById[row.playerId] ? (
                                       <Link to={`/players/${row.playerId}`} style={{ fontWeight: 600 }}>
                                         {playersById[row.playerId].name}
                                       </Link>
                                     ) : <strong>{row.playerName ?? row.playerId}</strong>}
                                   </td>
-                                  <td className="num">{row.overs}</td>
-                                  <td className="num">{row.maidens}</td>
-                                  <td className="num">{row.runsConceded}</td>
-                                  <td className="num">{row.wickets}</td>
-                                  <td className="num">
+                                  <td data-label="Overs" className="num">{row.overs}</td>
+                                  <td data-label="Maidens" className="num">{row.maidens}</td>
+                                  <td data-label="Runs" className="num">{row.runsConceded}</td>
+                                  <td data-label="Wickets" className="num">{row.wickets}</td>
+                                  <td data-label="Economy" className="num">
                                     {Number(row.overs) > 0
                                       ? (row.runsConceded / Math.max(1, Math.floor(Number(row.overs)) + ((Number(row.overs) % 1) * 10) / 6)).toFixed(2)
                                       : '\u2014'}

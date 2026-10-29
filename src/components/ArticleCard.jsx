@@ -26,7 +26,7 @@ export function ArticleCard({ article }) {
       )}
       <div className="article-meta">
         <span className="badge badge-gold">{article.category}</span>
-        {article.isSample && <span className="badge badge-muted">Sample content</span>}
+        {article.source && <span className="badge badge-muted">Sourced</span>}
         {relatedTeam && <span className="team-label"><TeamBadge team={relatedTeam} size="sm" /><span>{relatedTeam.name}</span></span>}
       </div>
       <h3>
@@ -38,6 +38,11 @@ export function ArticleCard({ article }) {
         <span aria-hidden="true">&middot;</span>
         <span>{formatLongDate(article.publishedAt)}</span>
       </div>
+      {article.source && (
+        <a className="tiny text-link" href={article.source.url} target="_blank" rel="noreferrer noopener">
+          Source: {article.source.label}
+        </a>
+      )}
     </article>
   )
 }

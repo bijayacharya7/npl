@@ -34,9 +34,9 @@ export default function News() {
         description="Independent Nepal Premier League coverage: team guides, tournament explainers and fan-focused analysis."
       />
       <PageHeader
-        eyebrow="From the fan zone"
+        eyebrow="Sourced NPL coverage"
         title="News &amp; explainers"
-        description="Original editorial written for this independent fan project. Development articles are labelled as sample content — no fabricated quotes and no copied reporting."
+        description="Concise, attributed NPL news summaries with links to the original reports. Match data and results are kept separate from editorial coverage."
       />
 
       <div className="row" style={{ marginBottom: '1.4rem', gap: '0.5rem' }}>

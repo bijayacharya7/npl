@@ -65,7 +65,7 @@ export default function PlayerDetail() {
             {initials(player.name)}
           </span>
         )}
-        <div style={{ flex: 1, minWidth: 220 }}>
+        <div style={{ flex: 1, minWidth: 0 }}>
           <div className="row" style={{ gap: '0.5rem' }}>
             <h1 style={{ fontSize: 'clamp(2rem, 3.6vw, 2.8rem)' }}>{player.name}</h1>
             {player.isCaptain && <span className="tag tag-captain">Captain</span>}

@@ -124,7 +124,7 @@ export default function Transfers() {
           </div>
 
           {/* Search Box */}
-          <div style={{ position: 'relative', minWidth: '240px', flex: '1 1 240px' }}>
+          <div style={{ position: 'relative', minWidth: 0, flex: '1 1 240px' }}>
             <Search
               size={15}
               style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', opacity: 0.5 }}
@@ -149,7 +149,7 @@ export default function Transfers() {
             display: 'flex',
             alignItems: 'center',
             gap: '0.6rem',
-            overflowX: 'auto',
+            flexWrap: 'wrap',
             paddingBottom: '0.4rem',
           }}
         >

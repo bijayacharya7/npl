@@ -1,4 +1,4 @@
-import { useMemo } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { Activity, ArrowRight, CalendarDays, Globe, MapPin, Sparkles, Trophy } from 'lucide-react'
 import { useData } from '../context/DataContext.jsx'
@@ -18,6 +18,50 @@ import { TRANSFERS } from '../data/transfers.js'
 
 const runsDef = LEADERBOARD_DEFINITIONS.find((d) => d.id === 'runs')
 const wicketsDef = LEADERBOARD_DEFINITIONS.find((d) => d.id === 'wickets')
+
+function HeroMatchStatus({ match, teamsById }) {
+  const [now, setNow] = useState(() => Date.now())
+  const hasStarted = match.status === 'live' || new Date(match.startTime).getTime() <= now
+  const inningsByTeam = new Map((match.innings ?? []).map((innings) => [innings.teamId, innings]))
+
+  useEffect(() => {
+    if (hasStarted) return undefined
+    const timer = setInterval(() => setNow(Date.now()), 1000)
+    return () => clearInterval(timer)
+  }, [hasStarted])
+
+  if (!hasStarted) return <Countdown target={match.startTime} />
+
+  const score = (teamId) => {
+    const innings = inningsByTeam.get(teamId)
+    if (!innings) return 'Waiting for score'
+    const wickets = Number(innings.wickets) >= 10 ? '' : `/${innings.wickets}`
+    return `${innings.runs}${wickets} (${innings.overs} ov)`
+  }
+  const teamName = (teamId, fallback) => teamsById[teamId]?.name ?? fallback ?? 'Team pending'
+
+  return (
+    <div className="live-score-summary" aria-live="polite">
+      <div className="live-score-summary-label">
+        <span className="live-dot" aria-hidden="true" />
+        LIVE UPDATES
+      </div>
+      <div className="live-score-summary-row">
+        <span>{teamName(match.homeTeamId, match.homeLabel)}</span>
+        <strong>{score(match.homeTeamId)}</strong>
+      </div>
+      <div className="live-score-summary-row">
+        <span>{teamName(match.awayTeamId, match.awayLabel)}</span>
+        <strong>{score(match.awayTeamId)}</strong>
+      </div>
+      {!match.innings?.length && (
+        <p className="tiny muted" style={{ marginTop: '0.45rem', textAlign: 'center' }}>
+          Live score feed connecting; updates will appear automatically.
+        </p>
+      )}
+    </div>
+  )
+}
 
 export default function Home() {
   const { teams, matches, teamsById, standings, playerStats, publishedArticles, loading, error, refresh, rules } =
@@ -124,7 +168,11 @@ export default function Home() {
               <div className="hero-panel">
                 <div className="hero-panel-top">
                   <span>Next match &middot; Match {nextMatch.matchNo}</span>
-                  <StatusBadge status={nextMatch.status} />
+                  <StatusBadge
+                    status={nextMatch.status}
+                    liveConfirmed={nextMatch.liveConfirmed}
+                    statusSource={nextMatch.statusSource}
+                  />
                 </div>
                 <div className="hero-team-row">
                   <div className="hero-team">
@@ -143,7 +191,7 @@ export default function Home() {
                   <MapPin size={11} aria-hidden="true" style={{ display: 'inline', verticalAlign: '-1px' }} /> TU
                   Cricket Ground, Kirtipur
                 </p>
-                <Countdown target={nextMatch.startTime} />
+                <HeroMatchStatus match={nextMatch} teamsById={teamsById} />
                 <Link to={`/matches/${nextMatch.id}`} className="btn btn-outline btn-block" style={{ marginTop: '0.9rem' }}>
                   Open match centre
                 </Link>

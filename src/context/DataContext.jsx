@@ -72,12 +72,12 @@ export function DataProvider({ children }) {
       const wait = feedPollingInterval(nextFeed, snapshot.matches)
       timer = setTimeout(poll, wait)
     }
-    timer = setTimeout(poll, 60_000)
+    timer = setTimeout(poll, feedPollingInterval(feed, snapshot.matches))
     return () => {
       cancelled = true
       clearTimeout(timer)
     }
-  }, [snapshot.matches])
+  }, [snapshot.matches, feed?.meta?.liveFresh])
 
   const value = useMemo(() => {
     const merged = mergeSnapshot(snapshot, feed)
@@ -93,6 +93,14 @@ export function DataProvider({ children }) {
     const matchesById = Object.fromEntries(matches.map((match) => [match.id, match]))
 
     const standings = computeStandings(matches, teams, snapshot.rules)
+    const liveStandings = computeStandings(matches, teams, snapshot.rules, 'league', { includeLive: true })
+    const hasLiveStandings = matches.some(
+      (match) =>
+        match.status === 'live' &&
+        match.stage === 'league' &&
+        match.innings?.some((innings) => innings.teamId === match.homeTeamId) &&
+        match.innings?.some((innings) => innings.teamId === match.awayTeamId),
+    )
     const playerStats = computePlayerStats({
       batting: merged.scorecards?.batting ?? [],
       bowling: merged.scorecards?.bowling ?? [],
@@ -116,6 +124,8 @@ export function DataProvider({ children }) {
       playersById,
       matchesById,
       standings,
+      liveStandings,
+      hasLiveStandings,
       playerStats,
       loading,
       error,

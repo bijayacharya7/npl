@@ -33,7 +33,7 @@ export class ErrorBoundary extends Component {
               </Link>
             </div>
             {import.meta.env.DEV && (
-              <pre style={{ textAlign: 'left', overflowX: 'auto', fontSize: '0.72rem', marginTop: '1rem' }}>
+              <pre style={{ textAlign: 'left', maxWidth: '100%', whiteSpace: 'pre-wrap', overflowWrap: 'anywhere', fontSize: '0.72rem', marginTop: '1rem' }}>
                 {String(this.state.error?.stack ?? this.state.error)}
               </pre>
             )}

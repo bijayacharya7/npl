@@ -8,7 +8,7 @@ export function StandingsTable({ rows, teamsById, compact = false, rules }) {
   return (
     <div>
       <div className="table-wrap">
-        <table className="data-table">
+        <table className="data-table stack-mobile-table">
           <caption className="sr-only">Nepal Premier League 2026 points table, calculated from match data</caption>
           <thead>
             <tr>
@@ -50,25 +50,25 @@ export function StandingsTable({ rows, teamsById, compact = false, rules }) {
                   key={row.teamId}
                   className={!compact && row.position <= 4 ? 'qualify-row' : undefined}
                 >
-                  <td className={`pos-cell ${row.position <= 4 ? 'top' : ''}`}>{row.position}</td>
-                  <td>
+                  <td data-label="Pos" className={`pos-cell ${row.position <= 4 ? 'top' : ''}`}>{row.position}</td>
+                  <td data-label="Team">
                     <Link to={`/teams/${row.teamId}`} className="team-cell">
                       <TeamBadge team={team} size="sm" />
                       <span>{team?.name ?? row.teamId}</span>
                     </Link>
                   </td>
-                  <td className="num">{row.played}</td>
-                  <td className="num">{row.won}</td>
-                  <td className="num">{row.lost}</td>
-                  <td className="num">{row.tied}</td>
-                  <td className="num">{row.noResult}</td>
-                  <td className="num" style={{ fontWeight: 800, color: 'var(--gold)' }}>
+                  <td data-label="Played" className="num">{row.played}</td>
+                  <td data-label="Won" className="num">{row.won}</td>
+                  <td data-label="Lost" className="num">{row.lost}</td>
+                  <td data-label="Tied" className="num">{row.tied}</td>
+                  <td data-label="No result" className="num">{row.noResult}</td>
+                  <td data-label="Points" className="num" style={{ fontWeight: 800, color: 'var(--gold)' }}>
                     {row.points}
                   </td>
-                  <td className={`num ${row.nrr > 0 ? 'nrr-pos' : row.nrr < 0 ? 'nrr-neg' : ''}`}>
+                  <td data-label="NRR" className={`num ${row.nrr > 0 ? 'nrr-pos' : row.nrr < 0 ? 'nrr-neg' : ''}`}>
                     {formatNRR(row.nrr)}
                   </td>
-                  <td className="num">
+                  <td data-label="Form" className="num">
                     <span className="form-list">
                       {row.form.length === 0 ? (
                         <span className="tiny muted">&mdash;</span>

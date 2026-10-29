@@ -127,6 +127,23 @@ describe('standings', () => {
     expect(table.every((r) => r.played === 0)).toBe(true)
   })
 
+  it('includes a live league match in a provisional table', () => {
+    const live = baseMatch({
+      id: 'm4',
+      status: 'live',
+      result: null,
+      innings: [
+        { teamId: 'a', runs: 161, wickets: 4, overs: 18 },
+        { teamId: 'b', runs: 150, wickets: 8, overs: 20 },
+      ],
+    })
+    const official = computeStandings([live], teams)
+    const provisional = computeStandings([live], teams, DEFAULT_POINTS_RULES, 'league', { includeLive: true })
+    expect(official.every((row) => row.played === 0)).toBe(true)
+    expect(provisional.find((row) => row.teamId === 'a')).toMatchObject({ played: 1, won: 1, points: 2 })
+    expect(provisional.find((row) => row.teamId === 'b')).toMatchObject({ played: 1, lost: 1, points: 0 })
+  })
+
   it('breaks equal points by run rate', () => {
     const match1 = baseMatch({ id: 'm1' })
     const match2 = baseMatch({
@@ -204,4 +221,3 @@ describe('player statistics', () => {
     expect(sixesBoard[0].sixes).toBe(6)
   })
 })
-

@@ -94,7 +94,13 @@ export function chargedBallsForInnings(innings, rules = DEFAULT_POINTS_RULES) {
  * @param {object} rules   points rules
  * @param {string} stage    which stage contributes to the table (default league)
  */
-export function computeStandings(matches = [], teams = [], rules = DEFAULT_POINTS_RULES, stage = 'league') {
+export function computeStandings(
+  matches = [],
+  teams = [],
+  rules = DEFAULT_POINTS_RULES,
+  stage = 'league',
+  { includeLive = false } = {},
+) {
   const rows = new Map()
 
   for (const team of teams) rows.set(team.id, blankRow(team.id))
@@ -104,7 +110,8 @@ export function computeStandings(matches = [], teams = [], rules = DEFAULT_POINT
   )
 
   for (const match of leagueMatches) {
-    const type = resultType(match)
+    const innings = Array.isArray(match.innings) ? match.innings : []
+    const type = resultType(match) ?? (includeLive ? liveResultType(match) : null)
     if (!type) continue
 
     const home = rows.get(match.homeTeamId)
@@ -130,7 +137,7 @@ export function computeStandings(matches = [], teams = [], rules = DEFAULT_POINT
       home.form.push('T')
       away.form.push('T')
     } else if (type === 'win') {
-      const winnerId = match.result?.winnerTeamId
+      const winnerId = match.result?.winnerTeamId ?? liveWinnerId(match)
       if (!winnerId) continue
       const winner = rows.get(winnerId)
       const loser = winnerId === match.homeTeamId ? away : home
@@ -143,7 +150,6 @@ export function computeStandings(matches = [], teams = [], rules = DEFAULT_POINT
     }
 
     // Add runs/overs for both innings when present.
-    const innings = Array.isArray(match.innings) ? match.innings : []
     for (const inningsRow of innings) {
       const row = rows.get(inningsRow.teamId)
       if (!row) continue
@@ -203,6 +209,28 @@ export function computeStandings(matches = [], teams = [], rules = DEFAULT_POINT
   })
 
   return result
+}
+
+function liveResultType(match) {
+  if (!match || match.status !== 'live' || match.result?.type) return null
+  const innings = Array.isArray(match.innings) ? match.innings : []
+  const homeInnings = innings.find((row) => row.teamId === match.homeTeamId)
+  const awayInnings = innings.find((row) => row.teamId === match.awayTeamId)
+  if (!homeInnings || !awayInnings) return null
+
+  const homeRuns = Number(homeInnings.runs)
+  const awayRuns = Number(awayInnings.runs)
+  if (!Number.isFinite(homeRuns) || !Number.isFinite(awayRuns)) return null
+  if (homeRuns === awayRuns) return 'tie'
+  return 'win'
+}
+
+function liveWinnerId(match) {
+  const innings = Array.isArray(match?.innings) ? match.innings : []
+  const home = innings.find((row) => row.teamId === match.homeTeamId)
+  const away = innings.find((row) => row.teamId === match.awayTeamId)
+  if (!home || !away) return null
+  return Number(home.runs) > Number(away.runs) ? match.homeTeamId : match.awayTeamId
 }
 
 /** Format NRR the way cricket tables do: +0.123 / -0.456 / 0.000. */
@@ -465,4 +493,3 @@ export function buildLeaderboard(stats, definition) {
   })
   return rows
 }
-

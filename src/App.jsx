@@ -12,6 +12,7 @@ const Results = lazy(() => import('./pages/Results.jsx'))
 const MatchDetail = lazy(() => import('./pages/MatchDetail.jsx'))
 const Standings = lazy(() => import('./pages/Standings.jsx'))
 const Stats = lazy(() => import('./pages/Stats.jsx'))
+const AllTimeStats = lazy(() => import('./pages/AllTimeStats.jsx'))
 const News = lazy(() => import('./pages/News.jsx'))
 const ArticleDetail = lazy(() => import('./pages/ArticleDetail.jsx'))
 const Transfers = lazy(() => import('./pages/Transfers.jsx'))
@@ -41,6 +42,7 @@ export default function App() {
           <Route path="matches/:matchId" element={<MatchDetail />} />
           <Route path="standings" element={<Standings />} />
           <Route path="stats" element={<Stats />} />
+          <Route path="stats/all-time" element={<AllTimeStats />} />
           <Route path="transfers" element={<Transfers />} />
           <Route path="news" element={<News />} />
           <Route path="news/:slug" element={<ArticleDetail />} />

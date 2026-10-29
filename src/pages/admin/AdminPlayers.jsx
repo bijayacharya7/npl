@@ -147,7 +147,7 @@ export default function AdminPlayers() {
       </div>
 
       <div className="table-wrap">
-        <table className="data-table admin-table">
+        <table className="data-table admin-table stack-mobile-table">
           <thead>
             <tr>
               <th scope="col">Player</th>
@@ -163,20 +163,20 @@ export default function AdminPlayers() {
           <tbody>
             {filtered.map((player) => (
               <tr key={player.id}>
-                <td>
+                <td data-label="Player">
                   <strong>{player.name}</strong>
                   {player.isCaptain && <span className="tag tag-captain" style={{ marginLeft: 6 }}>C</span>}
                   {player.jerseyNumber != null && <span className="tag" style={{ marginLeft: 6 }}>#{player.jerseyNumber}</span>}
                 </td>
-                <td>{teamsById[player.teamId]?.name ?? 'Unassigned'}</td>
-                <td>{player.role ? ROLE_LABELS[player.role] : <span className="muted">Not verified</span>}</td>
-                <td>{player.nationality ?? '\u2014'}</td>
-                <td>
+                <td data-label="Team">{teamsById[player.teamId]?.name ?? 'Unassigned'}</td>
+                <td data-label="Role">{player.role ? ROLE_LABELS[player.role] : <span className="muted">Not verified</span>}</td>
+                <td data-label="Nationality">{player.nationality ?? '\u2014'}</td>
+                <td data-label="Status">
                   <span className={`badge ${player.verified ? 'badge-green' : 'badge-warn'}`}>
                     {player.verified ? 'Verified' : 'Unverified'}
                   </span>
                 </td>
-                <td>
+                <td data-label="Actions">
                   <div className="row-actions">
                     <button
                       type="button"

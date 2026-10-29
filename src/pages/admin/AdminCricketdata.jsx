@@ -76,10 +76,9 @@ export default function AdminCricketdata() {
       <div className="admin-toolbar">
         <div>
           <span className="eyebrow">Integrations</span>
-          <h1>CricketData.org usage</h1>
+          <h1>Live cricket data</h1>
           <p className="small muted">
-            Shared daily budget, cache age and manual refresh. Signed in as {user?.email}. This page never
-            shows the API key.
+            Provider status, cache age and refresh. Signed in as {user?.email}. Server tokens are never shown.
           </p>
         </div>
         <button type="button" className="btn btn-outline btn-sm" onClick={load} disabled={busy}>
@@ -109,12 +108,13 @@ export default function AdminCricketdata() {
         </div>
       </div>
 
-      {!status.keyConfigured && (
+      {!status.sportmonksConfigured && (
         <div className="notice notice-gold" style={{ marginBottom: '1rem' }}>
           <AlertTriangle size={15} aria-hidden="true" />
           <span className="small">
-            <strong>No server key.</strong> Add <code>CRICKETDATA_API_KEY</code> to your local <code>.env</code> or
-            host environment. Do not use a <code>VITE_</code> prefix.
+            <strong>Live NPL scores are not connected.</strong> Add <code>SPORTMONKS_API_TOKEN</code> to your
+            local <code>.env</code> or Vercel server environment (never a <code>VITE_</code> variable).
+            The provider must include NPL coverage in your plan.
           </span>
         </div>
       )}
@@ -160,7 +160,7 @@ export default function AdminCricketdata() {
         </div>
         <div className="card-body">
           <div className="table-wrap">
-            <table className="data-table admin-table">
+            <table className="data-table admin-table stack-mobile-table">
               <thead>
                 <tr>
                   <th>Dataset</th>
@@ -173,11 +173,11 @@ export default function AdminCricketdata() {
               <tbody>
                 {(status.caches ?? []).map((row) => (
                   <tr key={row.key}>
-                    <td>{DATASET_LABELS[row.key] ?? row.key}</td>
-                    <td>{row.status}</td>
-                    <td>{ageLabel(row.ageMs)}</td>
+                    <td data-label="Dataset">{DATASET_LABELS[row.key] ?? row.key}</td>
+                    <td data-label="Status">{row.status}</td>
+                    <td data-label="Age">{ageLabel(row.ageMs)}</td>
                     <td>{row.expiresAt ? formatDateTime(row.expiresAt) : '—'}</td>
-                    <td className="num">
+                    <td data-label="Action" className="num">
                       {row.key !== 'npl_feed' && (
                         <button
                           type="button"
@@ -224,7 +224,7 @@ export default function AdminCricketdata() {
 
       <ConfirmDialog
         open={Boolean(confirmDataset)}
-        title="Refresh CricketData.org dataset?"
+        title="Refresh cricket data dataset?"
         confirmLabel={wouldExceed ? 'Budget exhausted' : 'Refresh'}
         message={
           wouldExceed

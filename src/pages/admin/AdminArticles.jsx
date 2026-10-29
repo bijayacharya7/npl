@@ -156,7 +156,7 @@ export default function AdminArticles() {
       </div>
 
       <div className="table-wrap">
-        <table className="data-table admin-table">
+        <table className="data-table admin-table stack-mobile-table">
           <thead>
             <tr>
               <th scope="col">Title</th>
@@ -172,26 +172,26 @@ export default function AdminArticles() {
           <tbody>
             {articles.length === 0 ? (
               <tr>
-                <td colSpan={6} className="small muted">
+                <td data-label="Articles" colSpan={6} className="small muted">
                   No articles yet. Publish your first explainer or match preview.
                 </td>
               </tr>
             ) : (
               articles.map((article) => (
                 <tr key={article.id}>
-                  <td>
+                  <td data-label="Title">
                     <strong>{article.title}</strong>
                     <div className="tiny muted">/{article.slug}</div>
                   </td>
-                  <td>{article.category}</td>
-                  <td>
+                  <td data-label="Category">{article.category}</td>
+                  <td data-label="Status">
                     <span className={`badge ${article.status === 'published' ? 'badge-green' : 'badge-muted'}`}>
                       {article.status}
                     </span>
                   </td>
-                  <td className="small">{formatDateTime(article.publishedAt)}</td>
-                  <td>{article.isSample ? <span className="badge badge-warn">Sample</span> : '\u2014'}</td>
-                  <td>
+                  <td data-label="Published" className="small">{formatDateTime(article.publishedAt)}</td>
+                  <td data-label="Label">{article.isSample ? <span className="badge badge-warn">Sample</span> : '\u2014'}</td>
+                  <td data-label="Actions">
                     <div className="row-actions">
                       <button type="button" className="btn btn-ghost btn-sm" onClick={() => open(article)}>
                         <Pencil size={13} aria-hidden="true" />

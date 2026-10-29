@@ -17,10 +17,11 @@ const TIE_BREAK_LABELS = {
 }
 
 export default function Standings() {
-  const { standings, teams, teamsById, matches, rules, loading } = useData()
+  const { standings, liveStandings, hasLiveStandings, teams, teamsById, matches, rules, loading } = useData()
   const [selected, setSelected] = useState('')
 
-  const teamRow = standings.find((row) => row.teamId === selected)
+  const displayedStandings = hasLiveStandings ? liveStandings : standings
+  const teamRow = displayedStandings.find((row) => row.teamId === selected)
   const team = selected ? teamsById[selected] : null
   const nextFixture = selected
     ? matches.find(
@@ -51,7 +52,7 @@ export default function Standings() {
         </EmptyState>
       ) : (
         <>
-          {!hasResults && (
+          {!hasResults && !hasLiveStandings && (
             <div className="notice notice-gold" style={{ marginBottom: '1rem' }}>
               <Info size={15} aria-hidden="true" />
               <span className="small">
@@ -61,7 +62,17 @@ export default function Standings() {
             </div>
           )}
 
-          <StandingsTable rows={standings} teamsById={teamsById} rules={rules} />
+          {hasLiveStandings && (
+            <div className="notice notice-gold" style={{ marginBottom: '1rem' }}>
+              <Info size={15} aria-hidden="true" />
+              <span className="small">
+                <strong>Live standings.</strong> The table includes provisional points and net run rate
+                from the current match. It will be confirmed when the result is official.
+              </span>
+            </div>
+          )}
+
+          <StandingsTable rows={displayedStandings} teamsById={teamsById} rules={rules} />
 
           <div className="grid grid-2" style={{ marginTop: '1.5rem' }}>
             <div className="card">

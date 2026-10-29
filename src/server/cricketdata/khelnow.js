@@ -1,4 +1,4 @@
-import { classifyMatchStatus, localMatchIsInLiveWindow, mapResult, matchLocalFixture, normalizeName, resolveTeamId } from './mapper.js'
+import { classifyMatchStatus, mapResult, matchLocalFixture, normalizeName, resolveTeamId } from './mapper.js'
 
 const KHELNOW_LIVE_INDEX = 'https://khelnow.com/cricket/live-score'
 const KHELNOW_NPL_RESULTS = 'https://khelnow.com/cricket/competition/nepal-premier-league-1547/fixtures-and-results?competition=1547'
@@ -239,7 +239,7 @@ function mapKhelNowScheduleMatch(row, localMatches, teams) {
   const status = Number(row.status) === 2 || /\bcompleted\b|\bwon by\b/i.test(statusText)
     ? 'completed'
     : classifyMatchStatus(statusText)
-  if (!['completed', 'abandoned', 'postponed'].includes(status)) return null
+  if (!['upcoming', 'live', 'completed', 'abandoned', 'postponed'].includes(status)) return null
 
   const homeTeamId = resolveTeamId(row.teama?.name, teams)
   const awayTeamId = resolveTeamId(row.teamb?.name, teams)
@@ -281,6 +281,11 @@ function mapKhelNowScheduleMatch(row, localMatches, teams) {
   }
 }
 
+function isInLiveWindow(match, now) {
+  const start = new Date(match?.startTime).getTime()
+  return Number.isFinite(start) && now >= start - 30 * 60 * 1000 && now <= start + 4 * 60 * 60 * 1000
+}
+
 function mergeScorecards(...scorecards) {
   const merged = { batting: [], bowling: [], fielding: [] }
   for (const kind of Object.keys(merged)) {
@@ -292,7 +297,15 @@ function mergeScorecards(...scorecards) {
   return merged
 }
 
-export async function fetchKhelNowNplLive({ localMatches, teams, players, previousPayload = null, now = Date.now(), fetchImpl = globalThis.fetch }) {
+export async function fetchKhelNowNplLive({
+  localMatches,
+  teams,
+  players,
+  previousPayload = null,
+  now = Date.now(),
+  fetchImpl = globalThis.fetch,
+  fetchAll = false,
+}) {
   let liveCandidates = []
   try {
     const pageProps = extractPageProps(await fetchText(KHELNOW_LIVE_INDEX, fetchImpl))
@@ -305,7 +318,7 @@ export async function fetchKhelNowNplLive({ localMatches, teams, players, previo
         teams: [row.teamA?.teamName, row.teamB?.teamName].filter(Boolean),
         date: localDate,
       }, localMatches, teams).local
-      return fixture && fixture.verifiedSchedule !== false && localMatchIsInLiveWindow(fixture, now) && row.matchId
+      return fixture && fixture.verifiedSchedule !== false && row.matchId
         ? [{ pageId: String(row.matchId), local: fixture }]
         : []
     })
@@ -327,7 +340,7 @@ export async function fetchKhelNowNplLive({ localMatches, teams, players, previo
     })
 
   const liveMatches = []
-  let liveScorecards = null
+  const liveScorecards = []
   for (const { pageId, local } of [...liveCandidates, ...knownMatches]) {
     try {
       const detailHtml = await fetchText(`${KHELNOW_MATCH_PAGE}${encodeURIComponent(pageId)}`, fetchImpl)
@@ -336,57 +349,77 @@ export async function fetchKhelNowNplLive({ localMatches, teams, players, previo
       if (!mapped) continue
       mapped.match.khelnowMatchPageId = pageId
       liveMatches.push(mapped.match)
-      liveScorecards = mapped.scorecards
+      if (mapped.scorecards) liveScorecards.push(mapped.scorecards)
     } catch {
       // Keep the prior score and continue to the competition results page.
     }
   }
 
-  const previousCompleted = (previousPayload?.matches ?? [])
-    .filter((match) => ['completed', 'abandoned', 'postponed'].includes(match.status))
+  const previousMatches = previousPayload?.matches ?? []
   const previousScorecards = previousPayload?.scorecards
 
-  if (liveMatches.length) {
+  if (liveMatches.length && !fetchAll) {
     const currentIds = new Set(liveMatches.map((match) => match.matchId))
-    const matches = [...previousCompleted.filter((match) => !currentIds.has(match.matchId)), ...liveMatches]
     return {
-      matches,
-      scorecards: mergeScorecards(previousScorecards, liveScorecards),
+      matches: [...previousMatches.filter((match) => !currentIds.has(match.matchId)), ...liveMatches],
+      scorecards: mergeScorecards(previousScorecards, ...liveScorecards),
       fetchedAt: new Date(now).toISOString(),
     }
   }
 
-  const resultsHtml = await fetchText(KHELNOW_NPL_RESULTS, fetchImpl)
-  const resultsProps = extractPageProps(resultsHtml)
-  const scheduleMatches = resultsProps.scheduleData?.data?.matches ?? []
-  const completedMatches = scheduleMatches
+  let scheduleMatches = []
+  try {
+    const resultsHtml = await fetchText(KHELNOW_NPL_RESULTS, fetchImpl)
+    const resultsProps = extractPageProps(resultsHtml)
+    scheduleMatches = resultsProps.scheduleData?.data?.matches ?? []
+  } catch {
+    if (liveMatches.length) {
+      const currentIds = new Set(liveMatches.map((match) => match.matchId))
+      return {
+        matches: [...previousMatches.filter((match) => !currentIds.has(match.matchId)), ...liveMatches],
+        scorecards: mergeScorecards(previousScorecards, ...liveScorecards),
+        fetchedAt: new Date(now).toISOString(),
+      }
+    }
+    throw new Error('KhelNow competition results are unavailable.')
+  }
+  const scheduledMatches = scheduleMatches
     .map((row) => mapKhelNowScheduleMatch(row, localMatches, teams))
     .filter(Boolean)
-  const completedIds = new Set(completedMatches.map((match) => match.matchId))
-  const matches = [
-    ...previousCompleted.filter((match) => !completedIds.has(match.matchId)),
-    ...completedMatches,
-  ]
+  const scheduledIds = new Set(scheduledMatches.map((match) => match.matchId))
+  const retainedMatches = previousMatches.filter((match) => !scheduledIds.has(match.matchId))
+  const matches = [...retainedMatches, ...scheduledMatches, ...liveMatches]
 
-  let recentScorecards = null
-  const latestCompleted = scheduleMatches
-    .filter((row) => Number(row.status) === 2 || /\bcompleted\b|\bwon by\b/i.test(`${row.status_str ?? ''} ${row.status_note ?? ''} ${row.result ?? ''}`))
-    .sort((a, b) => Number(b.timestamp_start ?? 0) - Number(a.timestamp_start ?? 0))[0]
-  if (latestCompleted?.id) {
+  const detailCandidates = [...scheduledMatches, ...liveMatches]
+    .filter((match) =>
+      (['completed', 'live'].includes(match.status) || isInLiveWindow(localMatches.find((local) => local.id === match.matchId), now)) &&
+      match.khelnowMatchPageId,
+    )
+  const detailedScorecards = liveScorecards
+  const detailedMatches = []
+  for (const scheduled of detailCandidates) {
+    if (liveMatches.some((match) => match.matchId === scheduled.matchId)) continue
     try {
-      const detailHtml = await fetchText(`${KHELNOW_MATCH_PAGE}${encodeURIComponent(latestCompleted.id)}`, fetchImpl)
-      const detailed = mapKhelNowMatch(matchDataFromPage(extractPageProps(detailHtml)),
-        localMatches.find((match) => matches.some((row) => row.matchId === match.id && row.khelnowMatchPageId === String(latestCompleted.id))),
-        teams, players)
-      recentScorecards = detailed?.scorecards ?? null
+      const detailHtml = await fetchText(`${KHELNOW_MATCH_PAGE}${encodeURIComponent(scheduled.khelnowMatchPageId)}`, fetchImpl)
+      const detailed = mapKhelNowMatch(
+        matchDataFromPage(extractPageProps(detailHtml)),
+        localMatches.find((match) => match.id === scheduled.matchId),
+        teams,
+        players,
+      )
+      if (detailed?.match) detailedMatches.push(detailed.match)
+      if (detailed?.scorecards) detailedScorecards.push(detailed.scorecards)
     } catch {
-      // The completed scores and result from the schedule remain usable without the detailed scorecard.
+      // Keep the schedule result and continue fetching the remaining match pages.
     }
   }
 
   return {
-    matches,
-    scorecards: mergeScorecards(previousScorecards, recentScorecards),
+    matches: [
+      ...matches.filter((match) => !detailedMatches.some((detailed) => detailed.matchId === match.matchId)),
+      ...detailedMatches,
+    ],
+    scorecards: mergeScorecards(previousScorecards, ...detailedScorecards),
     fetchedAt: new Date(now).toISOString(),
   }
 }

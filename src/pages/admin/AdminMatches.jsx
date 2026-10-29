@@ -337,7 +337,7 @@ export default function AdminMatches() {
         <TableSkeleton rows={8} />
       ) : (
         <div className="table-wrap">
-          <table className="data-table admin-table">
+          <table className="data-table admin-table stack-mobile-table">
             <thead>
               <tr>
                 <th scope="col">Match</th>
@@ -353,22 +353,22 @@ export default function AdminMatches() {
             <tbody>
               {filtered.map((match) => (
                 <tr key={match.id}>
-                  <td>
+                  <td data-label="Match">
                     <strong>#{match.matchNo}</strong>
                     <div className="tiny muted">{STAGE_LABELS[match.stage]}</div>
                   </td>
-                  <td>
+                  <td data-label="Teams">
                     {teamsById[match.homeTeamId]?.name ?? match.homeLabel ?? 'TBC'} v{' '}
                     {teamsById[match.awayTeamId]?.name ?? match.awayLabel ?? 'TBC'}
                   </td>
-                  <td>{formatDateTime(match.startTime)}</td>
-                  <td>
+                  <td data-label="Start">{formatDateTime(match.startTime)}</td>
+                  <td data-label="Status">
                     <StatusBadge status={match.status} />
                   </td>
-                  <td className="small">
+                  <td data-label="Result" className="small">
                     {match.result?.summary ?? (match.result?.winnerTeamId ? teamsById[match.result.winnerTeamId]?.name : '\u2014')}
                   </td>
-                  <td>
+                  <td data-label="Actions">
                     <div className="row-actions">
                       <button type="button" className="btn btn-ghost btn-sm" onClick={() => openScorecard(match)}>
                         <ClipboardList size={13} aria-hidden="true" />
@@ -873,7 +873,7 @@ export default function AdminMatches() {
 
             <hr className="divider" />
             <div className="table-wrap">
-              <table className="data-table" style={{ minWidth: 520 }}>
+              <table className="data-table stack-mobile-table">
                 <thead>
                   <tr>
                     <th scope="col">Player</th>
@@ -886,22 +886,22 @@ export default function AdminMatches() {
                 <tbody>
                   {currentRows.length === 0 ? (
                     <tr>
-                      <td colSpan={3} className="muted small">
+                      <td data-label="Scorecard" colSpan={3} className="muted small">
                         No {scoreForm.kind} rows for this match yet.
                       </td>
                     </tr>
                   ) : (
                     currentRows.map((row) => (
                       <tr key={row.id}>
-                        <td>{playersById[row.playerId]?.name ?? row.playerId}</td>
-                        <td className="small">
+                        <td data-label="Player">{playersById[row.playerId]?.name ?? row.playerId}</td>
+                        <td data-label="Details" className="small">
                           {scoreForm.kind === 'batting' &&
                             `${row.runs} (${row.balls}b), ${row.fours}x4, ${row.sixes}x6, ${row.out ? 'out' : 'not out'}`}
                           {scoreForm.kind === 'bowling' &&
                             `${row.overs} ov, ${row.maidens} m, ${row.runsConceded} r, ${row.wickets} w`}
                           {scoreForm.kind === 'fielding' && `${row.catches} catches, ${row.stumpings} stumpings`}
                         </td>
-                        <td>
+                        <td data-label="Actions">
                           <div className="row-actions">
                             <button
                               type="button"

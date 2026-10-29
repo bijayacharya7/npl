@@ -4,7 +4,6 @@ import { BarChart3, Search } from 'lucide-react'
 import { useData } from '../context/DataContext.jsx'
 import { Seo, PageHeader, EmptyState, TableSkeleton, DataNote } from '../components/ui.jsx'
 import { TeamBadge } from '../components/TeamBadge.jsx'
-import { ALL_TIME_RUNS, ALL_TIME_WICKETS, CHAMPIONS, RECORDS_AS_OF, RECORD_SOURCES, TOURNAMENT_RECORDS } from '../data/records.js'
 import {
   LEADERBOARD_DEFINITIONS,
   buildLeaderboard,
@@ -44,30 +43,6 @@ const CATEGORIES = ORDER.map((id) => {
   if (definition) return definition
   return { id, ...SPECIAL[id], special: id }
 })
-
-function HistoricalLeaderboard({ title, rows, stat, statLabel, secondary, teamsById }) {
-  return (
-    <section className="card" aria-label={title}>
-      <div className="card-head">
-        <h3 style={{ fontSize: '1.1rem' }}>{title}</h3>
-        <span className="badge badge-muted">Top {rows.length}</span>
-      </div>
-      <div className="leaderboard">
-        {rows.map((row, index) => (
-          <div className="leader-row" key={row.name}>
-            <span className="leader-rank">{index + 1}</span>
-            <TeamBadge team={Object.values(teamsById).find((team) => team.name === row.team)} size="sm" />
-            <span className="leader-main">
-              <span className="leader-name">{row.name}</span>
-              <span className="leader-sub">{row.team}{secondary(row) ? ` · ${secondary(row)}` : ''}</span>
-            </span>
-            <span className="leader-value">{row[stat]}<span className="leader-unit">{statLabel}</span></span>
-          </div>
-        ))}
-      </div>
-    </section>
-  )
-}
 
 export default function Stats() {
   const { scorecards, matches, players, teams, teamsById, loading } = useData()
@@ -175,62 +150,10 @@ export default function Stats() {
       />
       <PageHeader
         eyebrow="Verified scorecards only"
-        title="Player statistics"
-        description="Season 3 starts on 26 October. Explore NPL career records through 2025, then follow this season’s scorecard-based stats as matches are played."
+        title="NPL 2026 player statistics"
+        description="Follow Season 3 leaderboards from verified scorecards as matches are played. No placeholder numbers are shown."
+        actions={<Link to="/stats/all-time" className="btn btn-outline btn-sm">View all-time stats</Link>}
       />
-
-      <section className="section" aria-labelledby="historical-records-heading">
-        <div className="section-head">
-          <div>
-            <span className="eyebrow">Two completed seasons</span>
-            <h2 id="historical-records-heading">NPL records</h2>
-            <p className="small muted">All-time figures are through the end of Season 2. Season 3 had not started as of 23 October 2026.</p>
-          </div>
-          <span className="badge badge-muted">{RECORDS_AS_OF}</span>
-        </div>
-
-        <div className="grid grid-4" style={{ marginBottom: '1.2rem' }}>
-          {TOURNAMENT_RECORDS.map((record) => (
-            <article className="card card-pad" key={record.label}>
-              <span className="tiny muted">{record.label}</span>
-              <strong style={{ display: 'block', fontSize: '1.5rem', margin: '0.35rem 0' }}>{record.value}</strong>
-              <span className="small muted" style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-                {record.teamId && <TeamBadge team={teamsById[record.teamId]} size="sm" />}
-                {record.detail}
-              </span>
-            </article>
-          ))}
-        </div>
-
-        <div className="grid grid-2" style={{ marginBottom: '1.2rem' }}>
-          <HistoricalLeaderboard title="All-time run scorers" rows={ALL_TIME_RUNS} stat="runs" statLabel="runs" teamsById={teamsById} secondary={(row) => `${row.matches} matches · Avg ${row.average} · SR ${row.strikeRate}`} />
-          <HistoricalLeaderboard title="All-time wicket takers" rows={ALL_TIME_WICKETS} stat="wickets" statLabel="wkts" teamsById={teamsById} secondary={() => ''} />
-        </div>
-
-        <section className="card" aria-labelledby="champions-heading">
-          <div className="card-head"><h3 id="champions-heading" style={{ fontSize: '1.1rem' }}>NPL champions</h3><span className="badge badge-muted">Seasons 1–2</span></div>
-          <div className="leaderboard">
-            {CHAMPIONS.map((item) => (
-              <div className="leader-row" key={item.season}>
-                <span className="leader-rank">🏆</span>
-                <span className="leader-main">
-                  <span className="leader-name" style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}><TeamBadge team={teamsById[item.championId]} size="sm" />{item.champion}</span>
-                  <span className="leader-sub" style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}>{item.season} · Runner-up: <TeamBadge team={teamsById[item.runnerUpId]} size="sm" />{item.runnerUp}</span>
-                </span>
-                <span className="leader-value" style={{ fontSize: '0.85rem' }}>{item.result}</span>
-              </div>
-            ))}
-          </div>
-        </section>
-        <p className="tiny muted" style={{ marginTop: '0.65rem' }}>
-          Historical record sources: {RECORD_SOURCES.map((source, index) => (
-            <span key={source.url}>{index > 0 ? ' · ' : ''}<a className="text-link" href={source.url} target="_blank" rel="noreferrer noopener">{source.label}</a></span>
-          ))}. Figures are historical tournament aggregates; current-season tables below only include scorecards entered into this site.
-        </p>
-        <div className="notice" style={{ marginTop: '1rem' }}>
-          <strong>Coming in Season 3:</strong> The ICC has granted official T20 status to the 2026 edition, and CAN will use DRS in every match. Season 3 runs from 26 October to 21 November at Kirtipur; its scorecards will count toward official T20 career records.
-        </div>
-      </section>
 
       {loading ? (
         <TableSkeleton rows={8} />

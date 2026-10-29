@@ -14,7 +14,7 @@ Set these build-time variables in Vercel (or the frontend host):
 - `VITE_SUPABASE_ANON_KEY` (the publishable/anon key only)
 - `VITE_LOCAL_DEMO=false` (optional; production always ignores local demo mode)
 
-When the Supabase URL and anon key are configured, the production build uses Supabase Auth, Postgres, and Storage. Row-level security protects admin writes. A missing Supabase configuration leaves the public site read-only and disables admin sign-in.
+Both Supabase values are required for a production build; `src/lib/supabase.js` intentionally stops the build when either is missing. The URL and anon/publishable key are public browser configuration, not secrets. Apply every migration and seed before hosting so the site can load its shared content. Row-level security is the security boundary for admin writes. Do not deploy a local-demo build or treat browser-local data as shared production content.
 
 ## 3. Server environment
 
@@ -29,6 +29,10 @@ Never expose a service role key or provider key in a `VITE_` variable. The publi
 
 ## 4. Local development
 
-The local demo is enabled only by the Vite development server and uses `admin/admin` with browser-local sample data. Set `VITE_LOCAL_DEMO=false` in development to exercise Supabase Auth and the shared database. The demo shortcut is removed from production builds.
+The local demo is enabled only by the Vite development server and uses `admin/admin` with browser-local sample data. It is not a public multi-user data store. Set `VITE_LOCAL_DEMO=false` in development to exercise Supabase Auth and the shared database; production always disables local-demo mode.
 
-Run `npm test`, `npm run test:sql`, and `npm run build` before deployment. Then verify one admin sign-in, rejected non-admin sign-in, content create/edit/delete, image upload/delete, sign-out, public visibility from a separate browser, mobile layouts, and the deployed API/cron with production configuration.
+## 5. Build, deploy, and final public-launch checks
+
+Run `npm ci`, then `npm run test:release`. In Vercel, import this repository, set the frontend variables above for the production environment, and deploy with the checked-in Vite settings (`npm run build`, output directory `dist`). Add the server-only variables to Vercel only if you enable the scheduled CricketData refresh endpoint; without a provider key, the site still works with manually entered results and must not imply scores are live. The scheduled Vercel cron feature may require a paid plan—check your current Vercel plan before enabling it.
+
+After the first deploy, test the actual public origin: reload deep links, check browser console/network errors, verify public data from a signed-out session, sign in with the explicitly promoted admin, verify an ordinary account cannot write, test create/edit/delete and image uploads, and confirm storage policies. Review factual sources and sample article labels before publishing. Configure the custom domain in Vercel and follow its DNS instructions. Do not announce the site as production-ready until Supabase configuration, auth/RLS, storage and the actual deployed origin have been verified.

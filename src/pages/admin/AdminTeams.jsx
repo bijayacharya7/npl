@@ -91,7 +91,7 @@ export default function AdminTeams() {
       </div>
 
       <div className="table-wrap">
-        <table className="data-table admin-table">
+        <table className="data-table admin-table stack-mobile-table">
           <thead>
             <tr>
               <th scope="col">Team</th>
@@ -107,19 +107,19 @@ export default function AdminTeams() {
           <tbody>
             {teams.map((team) => (
               <tr key={team.id}>
-                <td>
+                <td data-label="Team">
                   <div className="row" style={{ gap: '0.5rem' }}>
                     <TeamBadge team={team} size="sm" />
                     <span style={{ fontWeight: 600 }}>{team.name}</span>
                   </div>
                 </td>
-                <td>{team.city ?? '\u2014'}</td>
-                <td>{team.captain ?? '\u2014'}</td>
-                <td>{team.headCoach ?? '\u2014'}</td>
-                <td>
+                <td data-label="City">{team.city ?? '\u2014'}</td>
+                <td data-label="Captain">{team.captain ?? '\u2014'}</td>
+                <td data-label="Head coach">{team.headCoach ?? '\u2014'}</td>
+                <td data-label="Source">
                   <VerificationBadge verified={Boolean(team.lastVerified)} label={team.lastVerified ?? 'No date'} />
                 </td>
-                <td>
+                <td data-label="Actions">
                   <div className="row-actions">
                     <button
                       type="button"
