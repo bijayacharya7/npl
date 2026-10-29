@@ -1,4 +1,4 @@
-import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react'
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react'
 import { computePlayerStats, computeStandings } from '../lib/cricket.js'
 import { emptyCricketdataFeed, fetchCricketdataFeed } from '../lib/cricketdata/feed.js'
 import { mergeSnapshot } from '../lib/cricketdata/merge.js'
@@ -22,8 +22,19 @@ export function DataProvider({ children }) {
   const [snapshot, setSnapshot] = useState(EMPTY)
   const [feed, setFeed] = useState(emptyCricketdataFeed())
   const [externalArticles, setExternalArticles] = useState([])
+  const feedRef = useRef(feed)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
+
+  const applyFeed = useCallback((nextFeed) => {
+    const previous = feedRef.current
+    const nextHasMatches = nextFeed?.overlay?.matches?.length > 0
+    const previousHasMatches = previous?.overlay?.matches?.length > 0
+    if (!nextHasMatches && previousHasMatches) return previous
+    feedRef.current = nextFeed
+    setFeed(nextFeed)
+    return nextFeed
+  }, [])
 
   const refresh = useCallback(async () => {
     setError(null)
@@ -38,7 +49,7 @@ export function DataProvider({ children }) {
         ...next,
         rules: next.rules ?? DEFAULT_POINTS_RULES,
       })
-      setFeed(nextFeed)
+      applyFeed(nextFeed)
       setExternalArticles(nextNews.articles)
     } catch (err) {
       console.error('[NPL Fan Zone] Failed to load data:', err)
@@ -60,7 +71,7 @@ export function DataProvider({ children }) {
         // The local snapshot is enough to render the first screen. Do not
         // hold the shell on the remote live-feed request.
         const [nextFeed, nextNews] = await Promise.all([fetchCricketdataFeed(), fetchExternalNews()])
-        if (active) setFeed(nextFeed)
+        if (active) applyFeed(nextFeed)
         if (active) setExternalArticles(nextNews.articles)
       } catch (err) {
         console.error('[NPL Fan Zone] Failed to load data:', err)
@@ -85,7 +96,7 @@ export function DataProvider({ children }) {
       const nextFeed = await fetchCricketdataFeed()
       polling = false
       if (cancelled) return
-      setFeed(nextFeed)
+      applyFeed(nextFeed)
       const wait = feedPollingInterval(nextFeed, snapshot.matches)
       timer = setTimeout(poll, wait)
     }
@@ -104,7 +115,7 @@ export function DataProvider({ children }) {
       window.removeEventListener('focus', refreshOnReturn)
       document.removeEventListener('visibilitychange', refreshOnReturn)
     }
-  }, [snapshot.matches, feed?.meta?.liveFresh])
+  }, [applyFeed, snapshot.matches, feed?.meta?.liveFresh])
 
   useEffect(() => {
     let active = true
