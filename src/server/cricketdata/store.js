@@ -320,13 +320,13 @@ export function createSupabaseStore(url, serviceKey) {
 }
 
 export function createStore(config) {
-  if (config.supabaseUrl && config.supabaseServiceKey) {
-    return createSupabaseStore(config.supabaseUrl, config.supabaseServiceKey)
-  }
   // Vercel functions cannot persist writes to the deployment filesystem.
   // Keep the public feed available between requests in one warm instance;
   // Supabase remains the durable cache when configured.
   if (process.env.VERCEL) return createMemoryStore()
+  if (config.supabaseUrl && config.supabaseServiceKey) {
+    return createSupabaseStore(config.supabaseUrl, config.supabaseServiceKey)
+  }
   return createFileStore(config.cacheFile)
 }
 
