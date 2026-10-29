@@ -227,7 +227,7 @@ export default function Home() {
                   display: 'inline-flex',
                   alignItems: 'center',
                   gap: '5px',
-                  background: '#e63946',
+                  background: '#b91c1c',
                   color: '#fff',
                   fontSize: '0.72rem',
                   fontWeight: 800,

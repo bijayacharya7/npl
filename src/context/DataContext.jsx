@@ -45,10 +45,15 @@ export function DataProvider({ children }) {
     let active = true
     const load = async () => {
       try {
-        const [next, nextFeed] = await Promise.all([activeStore.loadSnapshot(), fetchCricketdataFeed()])
+        const next = await activeStore.loadSnapshot()
         if (!active) return
         setSnapshot({ ...EMPTY, ...next, rules: next.rules ?? DEFAULT_POINTS_RULES })
-        setFeed(nextFeed)
+        setLoading(false)
+
+        // The local snapshot is enough to render the first screen. Do not
+        // hold the shell on the remote live-feed request.
+        const nextFeed = await fetchCricketdataFeed()
+        if (active) setFeed(nextFeed)
       } catch (err) {
         console.error('[NPL Fan Zone] Failed to load data:', err)
         if (active) setError(err.message ?? 'Could not load tournament data.')
