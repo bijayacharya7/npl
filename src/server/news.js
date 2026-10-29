@@ -11,6 +11,14 @@ const FEEDS = [
 
 const FALLBACK_IMAGE =
   'https://images.unsplash.com/photo-1531415074968-036ba1b575da?auto=format&fit=crop&w=1200&q=80'
+const DISTINCT_COVER_IMAGES = [
+  'https://images.unsplash.com/photo-1540747913346-19e32dc3e97e?auto=format&fit=crop&w=1200&q=80',
+  'https://images.unsplash.com/photo-1531415074968-036ba1b575da?auto=format&fit=crop&w=1200&q=80',
+  'https://images.unsplash.com/photo-1552674605-db6ffd4facb5?auto=format&fit=crop&w=1200&q=80',
+  'https://images.unsplash.com/photo-1579952363873-27f3bade9f55?auto=format&fit=crop&w=1200&q=80',
+  'https://images.unsplash.com/photo-1579952363873-27f3bade9f55?auto=format&fit=crop&w=1200&q=80&sat=-20',
+  'https://images.unsplash.com/photo-1517466787929-bc90951d0974?auto=format&fit=crop&w=1200&q=80',
+]
 const CACHE_TTL_MS = 10 * 60 * 1000
 const cache = new Map()
 
@@ -55,6 +63,22 @@ function imageFromItem(item) {
     tagAttribute(item, 'enclosure', 'url') ||
     FALLBACK_IMAGE
   )
+}
+
+export function distinctCoverImages(items) {
+  const used = new Set()
+  let fallbackIndex = 0
+  return items.map((item) => {
+    let image = item.coverImageUrl
+    if (used.has(image) || image === FALLBACK_IMAGE) {
+      const baseImage = DISTINCT_COVER_IMAGES[fallbackIndex % DISTINCT_COVER_IMAGES.length]
+      image = `${baseImage}&variant=${fallbackIndex}`
+      fallbackIndex += 1
+      item = { ...item, coverImageUrl: image, imageCredit: 'NPL Fan Zone cover image' }
+    }
+    used.add(image)
+    return item
+  })
 }
 
 function imageFromHtml(html, pageUrl) {
@@ -145,7 +169,8 @@ export async function fetchExternalNews() {
     .filter((item) => /nepal premier league|\bnpl\b/i.test(`${item.title} ${item.excerpt}`))
     .sort((a, b) => new Date(b.publishedAt) - new Date(a.publishedAt))
     .slice(0, 30)
+  const withDistinctImages = distinctCoverImages(unique)
 
-  cache.set('external-news', { expiresAt: now + CACHE_TTL_MS, items: unique })
-  return unique
+  cache.set('external-news', { expiresAt: now + CACHE_TTL_MS, items: withDistinctImages })
+  return withDistinctImages
 }

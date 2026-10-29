@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { parseNewsRss } from './news.js'
+import { distinctCoverImages, parseNewsRss } from './news.js'
 
 describe('external news RSS parsing', () => {
   it('creates attributed summaries without copying the full article', () => {
@@ -35,5 +35,14 @@ describe('external news RSS parsing', () => {
     )
 
     expect(articles[0].coverImageUrl).toBe('https://publisher.example/images/npl.jpg')
+  })
+
+  it('keeps repeated external news cover images visually distinct', () => {
+    const articles = distinctCoverImages([
+      { coverImageUrl: 'https://shared.example/image.jpg' },
+      { coverImageUrl: 'https://shared.example/image.jpg' },
+      { coverImageUrl: 'https://shared.example/image.jpg' },
+    ])
+    expect(new Set(articles.map((article) => article.coverImageUrl)).size).toBe(articles.length)
   })
 })
