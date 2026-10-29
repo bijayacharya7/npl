@@ -36,7 +36,7 @@ export default function News() {
       <PageHeader
         eyebrow="Sourced NPL coverage"
         title="News &amp; explainers"
-        description="Concise, attributed NPL news summaries with links to the original reports. Match data and results are kept separate from editorial coverage."
+        description="Automatically refreshed NPL coverage from public news feeds, with publisher credits and links to every original report."
       />
 
       <div className="row" style={{ marginBottom: '1.4rem', gap: '0.5rem' }}>

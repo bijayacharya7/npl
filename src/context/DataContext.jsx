@@ -3,6 +3,7 @@ import { computePlayerStats, computeStandings } from '../lib/cricket.js'
 import { emptyCricketdataFeed, fetchCricketdataFeed } from '../lib/cricketdata/feed.js'
 import { mergeSnapshot } from '../lib/cricketdata/merge.js'
 import { feedPollingInterval } from '../lib/cricketdata/polling.js'
+import { fetchExternalNews } from '../lib/news.js'
 import { store as activeStore, isDemoMode } from '../lib/store/index.js'
 import { DEFAULT_POINTS_RULES } from '../data/tournament.js'
 
@@ -20,19 +21,25 @@ const EMPTY = {
 export function DataProvider({ children }) {
   const [snapshot, setSnapshot] = useState(EMPTY)
   const [feed, setFeed] = useState(emptyCricketdataFeed())
+  const [externalArticles, setExternalArticles] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
 
   const refresh = useCallback(async () => {
     setError(null)
     try {
-      const [next, nextFeed] = await Promise.all([activeStore.loadSnapshot(), fetchCricketdataFeed()])
+      const [next, nextFeed, nextNews] = await Promise.all([
+        activeStore.loadSnapshot(),
+        fetchCricketdataFeed(),
+        fetchExternalNews(),
+      ])
       setSnapshot({
         ...EMPTY,
         ...next,
         rules: next.rules ?? DEFAULT_POINTS_RULES,
       })
       setFeed(nextFeed)
+      setExternalArticles(nextNews.articles)
     } catch (err) {
       console.error('[NPL Fan Zone] Failed to load data:', err)
       setError(err.message ?? 'Could not load tournament data.')
@@ -52,8 +59,9 @@ export function DataProvider({ children }) {
 
         // The local snapshot is enough to render the first screen. Do not
         // hold the shell on the remote live-feed request.
-        const nextFeed = await fetchCricketdataFeed()
+        const [nextFeed, nextNews] = await Promise.all([fetchCricketdataFeed(), fetchExternalNews()])
         if (active) setFeed(nextFeed)
+        if (active) setExternalArticles(nextNews.articles)
       } catch (err) {
         console.error('[NPL Fan Zone] Failed to load data:', err)
         if (active) setError(err.message ?? 'Could not load tournament data.')
@@ -84,12 +92,25 @@ export function DataProvider({ children }) {
     }
   }, [snapshot.matches, feed?.meta?.liveFresh])
 
+  useEffect(() => {
+    let active = true
+    const refreshNews = async () => {
+      const next = await fetchExternalNews()
+      if (active) setExternalArticles(next.articles)
+    }
+    const timer = setInterval(refreshNews, 10 * 60 * 1000)
+    return () => {
+      active = false
+      clearInterval(timer)
+    }
+  }, [])
+
   const value = useMemo(() => {
     const merged = mergeSnapshot(snapshot, feed)
     const teams = [...merged.teams].sort((a, b) => a.name.localeCompare(b.name))
     const players = [...merged.players].sort((a, b) => a.name.localeCompare(b.name))
     const matches = [...merged.matches].sort((a, b) => new Date(a.startTime) - new Date(b.startTime))
-    const articles = [...merged.articles].sort(
+    const articles = [...new Map([...merged.articles, ...externalArticles].map((article) => [article.id, article])).values()].sort(
       (a, b) => new Date(b.publishedAt ?? 0) - new Date(a.publishedAt ?? 0),
     )
 
@@ -139,7 +160,7 @@ export function DataProvider({ children }) {
       isDemo: isDemoMode,
       mode: activeStore.mode,
     }
-  }, [snapshot, feed, loading, error, refresh])
+  }, [snapshot, feed, externalArticles, loading, error, refresh])
 
   return <DataContext.Provider value={value}>{children}</DataContext.Provider>
 }

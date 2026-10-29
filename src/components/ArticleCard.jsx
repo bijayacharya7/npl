@@ -26,6 +26,7 @@ export function ArticleCard({ article }) {
       )}
       <div className="article-meta">
         <span className="badge badge-gold">{article.category}</span>
+        {article.isExternal && <span className="badge badge-muted">From the web</span>}
         {article.source && <span className="badge badge-muted">Sourced</span>}
         {relatedTeam && <span className="team-label"><TeamBadge team={relatedTeam} size="sm" /><span>{relatedTeam.name}</span></span>}
       </div>

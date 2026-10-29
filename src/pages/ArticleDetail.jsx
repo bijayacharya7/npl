@@ -45,6 +45,7 @@ export default function ArticleDetail() {
       <article className="container-narrow" style={{ paddingInline: 0 }}>
         <div className="article-meta" style={{ marginBottom: '0.7rem' }}>
           <span className="badge badge-gold">{article.category}</span>
+          {article.isExternal && <span className="badge badge-muted">External report</span>}
           {article.source && <span className="badge badge-muted">Sourced</span>}
           {article.status === 'draft' && <span className="badge badge-warn">Draft preview</span>}
         </div>
@@ -111,7 +112,7 @@ export default function ArticleDetail() {
         {article.source && (
           <div className="notice" style={{ marginTop: '1.2rem' }}>
             <span className="small">
-              This article is a summary by NPL Fan Zone. Read the full report at{' '}
+              This is a short summary shown by NPL Fan Zone. Read the full report at{' '}
               <a className="text-link" href={article.source.url} target="_blank" rel="noreferrer noopener">
                 {article.source.label}
               </a>
