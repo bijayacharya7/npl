@@ -78,17 +78,31 @@ export function DataProvider({ children }) {
   useEffect(() => {
     let cancelled = false
     let timer
+    let polling = false
     const poll = async () => {
+      if (polling) return
+      polling = true
       const nextFeed = await fetchCricketdataFeed()
+      polling = false
       if (cancelled) return
       setFeed(nextFeed)
       const wait = feedPollingInterval(nextFeed, snapshot.matches)
       timer = setTimeout(poll, wait)
     }
+    const refreshOnReturn = () => {
+      if (document.visibilityState === 'visible') {
+        clearTimeout(timer)
+        poll()
+      }
+    }
+    window.addEventListener('focus', refreshOnReturn)
+    document.addEventListener('visibilitychange', refreshOnReturn)
     timer = setTimeout(poll, feedPollingInterval(feed, snapshot.matches))
     return () => {
       cancelled = true
       clearTimeout(timer)
+      window.removeEventListener('focus', refreshOnReturn)
+      document.removeEventListener('visibilitychange', refreshOnReturn)
     }
   }, [snapshot.matches, feed?.meta?.liveFresh])
 

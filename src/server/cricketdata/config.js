@@ -42,7 +42,7 @@ export function getConfig(env = process.env) {
       results: envNumber(env, 'CRICKETDATA_TTL_RESULTS_MS', 12 * hour),
       playerStats: envNumber(env, 'CRICKETDATA_TTL_STATS_MS', 12 * hour),
       points: envNumber(env, 'CRICKETDATA_TTL_POINTS_MS', 60 * minute),
-      live: envNumber(env, 'CRICKETDATA_TTL_LIVE_MS', 30 * 1000),
+      live: envNumber(env, 'CRICKETDATA_TTL_LIVE_MS', 10 * 1000),
       seriesSearch: envNumber(env, 'CRICKETDATA_TTL_SEARCH_MS', 24 * hour),
     },
     requestTimeoutMs: envNumber(env, 'CRICKETDATA_TIMEOUT_MS', 12000),

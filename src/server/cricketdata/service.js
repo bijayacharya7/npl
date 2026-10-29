@@ -18,12 +18,12 @@ import { createMemoryStore, createStore } from './store.js'
 
 const inflight = new Map()
 const minute = 60 * 1000
-const LIVE_SCORECARD_TTL_MS = 30 * 1000
+const LIVE_SCORECARD_TTL_MS = 10 * 1000
 const CRICBUZZ_CACHE_KEY = 'cricbuzz_npl_live'
-const CRICBUZZ_CACHE_MS = 30 * 1000
+const CRICBUZZ_CACHE_MS = 10 * 1000
 const KHELNOW_CACHE_KEY = 'khelnow_npl_matches'
 const KHELNOW_CACHE_MS = 5 * minute
-const KHELNOW_LIVE_CACHE_MS = 30 * 1000
+const KHELNOW_LIVE_CACHE_MS = 10 * 1000
 
 function nplSeasonIsActive(matches, now) {
   const starts = matches.map((match) => new Date(match.startTime).getTime()).filter(Number.isFinite)
