@@ -52,9 +52,39 @@ function imageFromItem(item) {
   return (
     tagAttribute(item, 'media:content', 'url') ||
     tagAttribute(item, 'media:thumbnail', 'url') ||
-    tagValue(item, 'enclosure') ||
+    tagAttribute(item, 'enclosure', 'url') ||
     FALLBACK_IMAGE
   )
+}
+
+function imageFromHtml(html, pageUrl) {
+  const match =
+    html.match(/<meta[^>]+(?:property|name)=["'](?:og:image|twitter:image)["'][^>]+content=["']([^"']+)/i) ||
+    html.match(/<meta[^>]+content=["']([^"']+)["'][^>]+(?:property|name)=["'](?:og:image|twitter:image)["']/i)
+  if (!match?.[1]) return null
+  try {
+    const url = new URL(decodeXml(match[1]), pageUrl)
+    return /^https?:$/i.test(url.protocol) ? url.href : null
+  } catch {
+    return null
+  }
+}
+
+async function enrichWithPublisherImage(article) {
+  if (article.coverImageUrl !== FALLBACK_IMAGE) return article
+  try {
+    const response = await fetch(article.source.url, {
+      headers: { Accept: 'text/html,application/xhtml+xml' },
+      redirect: 'follow',
+      signal: AbortSignal.timeout(5000),
+    })
+    if (!response.ok) return article
+    const html = await response.text()
+    const image = imageFromHtml(html, response.url)
+    return image ? { ...article, coverImageUrl: image, imageCredit: article.author } : article
+  } catch {
+    return article
+  }
 }
 
 export function parseNewsRss(xml, feedQuery) {
@@ -100,7 +130,8 @@ async function fetchFeed(feed) {
     signal: AbortSignal.timeout(8000),
   })
   if (!response.ok) throw new Error(`News feed returned HTTP ${response.status}.`)
-  return parseNewsRss(await response.text(), feed.query)
+  const articles = parseNewsRss(await response.text(), feed.query)
+  return Promise.all(articles.map(enrichWithPublisherImage))
 }
 
 export async function fetchExternalNews() {

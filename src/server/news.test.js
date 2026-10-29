@@ -23,4 +23,17 @@ describe('external news RSS parsing', () => {
     })
     expect(articles[0].excerpt).toBe('A short report about the Nepal Premier League.')
   })
+
+  it('reads the publisher image from RSS media metadata', () => {
+    const articles = parseNewsRss(
+      `<rss><channel><item>
+        <title>NPL image report</title>
+        <link>https://publisher.example/npl-image</link>
+        <media:content url="https://publisher.example/images/npl.jpg" />
+      </item></channel></rss>`,
+      'NPL Nepal cricket',
+    )
+
+    expect(articles[0].coverImageUrl).toBe('https://publisher.example/images/npl.jpg')
+  })
 })
