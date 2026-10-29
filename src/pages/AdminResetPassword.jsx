@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { LockKeyhole, Shield } from 'lucide-react'
 import { useAuth } from '../context/AuthContext.jsx'
+import { supabase } from '../lib/supabase.js'
 import { Seo } from '../components/ui.jsx'
 
 export default function AdminResetPassword() {
@@ -14,9 +15,39 @@ export default function AdminResetPassword() {
   const [ready, setReady] = useState(false)
 
   useEffect(() => {
-    if (authMode !== 'supabase') return
-    const timer = window.setTimeout(() => setReady(true), 500)
-    return () => window.clearTimeout(timer)
+    if (authMode !== 'supabase' || !supabase) {
+      setReady(true)
+      return undefined
+    }
+
+    let active = true
+    let settled = false
+    const finish = (hasSession) => {
+      if (!active || settled) return
+      settled = true
+      if (!hasSession) setError('This recovery link is invalid or expired. Request a new reset email.')
+      setReady(true)
+    }
+
+    supabase.auth.getSession()
+      .then(({ data, error: sessionError }) => {
+        if (sessionError) {
+          finish(false)
+          return
+        }
+        finish(Boolean(data.session))
+      })
+      .catch(() => finish(false))
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      if (event === 'PASSWORD_RECOVERY' || session) finish(Boolean(session))
+    })
+    const timer = window.setTimeout(() => finish(false), 5000)
+    return () => {
+      active = false
+      window.clearTimeout(timer)
+      subscription.unsubscribe()
+    }
   }, [authMode])
 
   const submit = async (event) => {
@@ -26,7 +57,10 @@ export default function AdminResetPassword() {
     if (password !== confirmation) return setError('Passwords do not match.')
     setBusy(true)
     try {
-      const { supabase } = await import('../lib/supabase.js')
+      const { data: sessionData } = await supabase.auth.getSession()
+      if (!sessionData.session) {
+        throw new Error('This recovery link is invalid or expired. Request a new reset email.')
+      }
       const { error: updateError } = await supabase.auth.updateUser({ password })
       if (updateError) throw updateError
       await refresh()
