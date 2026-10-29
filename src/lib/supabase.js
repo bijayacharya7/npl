@@ -15,10 +15,6 @@ const looksPlaceholder = (value) =>
  */
 export const isSupabaseConfigured = !looksPlaceholder(url) && !looksPlaceholder(anonKey)
 
-if (import.meta.env.PROD && !isSupabaseConfigured) {
-  throw new Error('Production builds require VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY.')
-}
-
 if (url && !anonKey) {
   console.warn(
     '[NPL Fan Zone] VITE_SUPABASE_URL is set but VITE_SUPABASE_ANON_KEY is missing. Falling back to local demo mode.',
