@@ -17,6 +17,7 @@ const News = lazy(() => import('./pages/News.jsx'))
 const ArticleDetail = lazy(() => import('./pages/ArticleDetail.jsx'))
 const Transfers = lazy(() => import('./pages/Transfers.jsx'))
 const AdminLogin = lazy(() => import('./pages/AdminLogin.jsx'))
+const AdminResetPassword = lazy(() => import('./pages/AdminResetPassword.jsx'))
 const AboutData = lazy(() => import('./pages/InfoPages.jsx').then((module) => ({ default: module.AboutData })))
 const Privacy = lazy(() => import('./pages/InfoPages.jsx').then((module) => ({ default: module.Privacy })))
 const NotFound = lazy(() => import('./pages/InfoPages.jsx').then((module) => ({ default: module.NotFound })))
@@ -49,6 +50,7 @@ export default function App() {
           <Route path="about-data" element={<AboutData />} />
           <Route path="privacy" element={<Privacy />} />
           <Route path="admin/login" element={<AdminLogin />} />
+          <Route path="admin/reset-password" element={<AdminResetPassword />} />
 
           <Route
             path="admin"

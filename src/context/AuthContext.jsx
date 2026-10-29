@@ -125,6 +125,16 @@ export function AuthProvider({ children }) {
     setUser(null)
   }, [])
 
+  const requestPasswordReset = useCallback(async (email) => {
+    if (authMode !== 'supabase' || !supabase) {
+      throw new Error('Password reset is unavailable until Supabase is configured.')
+    }
+    const { error } = await supabase.auth.resetPasswordForEmail(String(email ?? '').trim(), {
+      redirectTo: `${window.location.origin}/admin/reset-password`,
+    })
+    if (error) throw new Error(error.message)
+  }, [])
+
   const refresh = useCallback(async () => {
     if (authMode === 'local') {
       const session = localAuth.getSession()
@@ -139,8 +149,8 @@ export function AuthProvider({ children }) {
   }, [])
 
   const value = useMemo(
-    () => ({ user, loading, signIn, signOut, refresh, authMode }),
-    [user, loading, signIn, signOut, refresh],
+    () => ({ user, loading, signIn, signOut, refresh, requestPasswordReset, authMode }),
+    [user, loading, signIn, signOut, refresh, requestPasswordReset],
   )
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>
 }

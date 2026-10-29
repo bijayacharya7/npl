@@ -5,13 +5,14 @@ import { useAuth } from '../context/AuthContext.jsx'
 import { Seo } from '../components/ui.jsx'
 
 export default function AdminLogin() {
-  const { user, signIn, authMode } = useAuth()
+  const { user, signIn, authMode, requestPasswordReset } = useAuth()
   const navigate = useNavigate()
   const [searchParams] = useSearchParams()
   const [id, setId] = useState('')
   const [password, setPassword] = useState('')
   const [error, setError] = useState('')
   const [busy, setBusy] = useState(false)
+  const [resetSent, setResetSent] = useState(false)
   const usesEmail = authMode === 'supabase' || authMode === 'local'
   const requestedPath = searchParams.get('next') ?? '/admin'
   const destination = requestedPath.startsWith('/admin') && requestedPath !== '/admin/login'
@@ -31,6 +32,24 @@ export default function AdminLogin() {
       setError(err.message || 'Could not sign in.')
     } finally {
       setBusy(false)
+    }
+
+    const sendReset = async () => {
+      setError('')
+      setResetSent(false)
+      if (!id.trim()) {
+        setError('Enter your admin email first.')
+        return
+      }
+      setBusy(true)
+      try {
+        await requestPasswordReset(id)
+        setResetSent(true)
+      } catch (err) {
+        setError(err.message || 'Could not send the reset email.')
+      } finally {
+        setBusy(false)
+      }
     }
   }
 
@@ -77,11 +96,17 @@ export default function AdminLogin() {
             />
           </div>
           {error && <p className="form-error" role="alert">{error}</p>}
+          {resetSent && <p className="small text-success" role="status">Reset email sent. Check your inbox.</p>}
           <button type="submit" className="btn btn-primary btn-block" disabled={busy || authMode === 'disabled'}>
             <LockKeyhole size={15} aria-hidden="true" />
             {busy ? 'Signing in…' : 'Sign in'}
           </button>
         </form>
+        {authMode === 'supabase' && (
+          <button type="button" className="btn btn-ghost btn-block" onClick={sendReset} disabled={busy}>
+            Forgot password?
+          </button>
+        )}
         <p className="auth-foot"><Link to="/">Back to the NPL site</Link></p>
       </section>
     </div>
